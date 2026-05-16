@@ -46,9 +46,25 @@ if [ "$before" = "$zero_sha" ]; then
   fi
 fi
 
+# Both refs must be reachable from local history. If either isn't (e.g. a
+# force-push rewrote `before` out of the tree), fail loud rather than
+# silently producing an empty changeset — a silent no-op deploy on a
+# force-push would skip every item the user actually intended to push.
+for ref in "$before" "$after"; do
+  if ! git cat-file -e "$ref" 2>/dev/null; then
+    echo "ERROR: ref '$ref' is not reachable from local history." >&2
+    echo "  This usually means a force-push rewrote it. Re-run the deploy" >&2
+    echo "  workflow via workflow_dispatch, or push a no-op commit on master" >&2
+    echo "  to reset the before-ref baseline." >&2
+    exit 2
+  fi
+done
+
 # --diff-filter=ACMRT: Added, Copied, Modified, Renamed, Type-changed.
 # Deletions (D) and unmerged (U) are excluded — see per-item-push-not-sync.md.
-mapfile -t changed < <(git diff --name-only --diff-filter=ACMRT "$before" "$after" -- 'f/**' || true)
+# No `|| true` here: with both refs verified above, a non-zero exit from
+# `git diff` is a real bug we want to surface, not swallow.
+mapfile -t changed < <(git diff --name-only --diff-filter=ACMRT "$before" "$after" -- 'f/**')
 
 # Process each path. We may emit multiple times for the same logical
 # item (e.g. several files inside one .raw_app/); final sort -u dedupes.

@@ -46,15 +46,19 @@ fi
 echo "Found ${#tests[@]} test script(s). Running against $WORKSPACE..."
 echo
 
+# Single temp file reused across iterations + a single EXIT trap. The
+# previous shape (mktemp + trap inside the loop) overwrote the trap on
+# every iteration, so only the last temp file was cleaned and N-1 leaked
+# into $TMPDIR.
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
 failed=()
 for file in "${tests[@]}"; do
   # Map file path → Windmill script path. f/shared/foo_test.ts → f/shared/foo_test
   script_path="${file%.ts}"
   script_path="${script_path%.py}"
   echo "▶ $script_path"
-
-  tmp=$(mktemp)
-  trap 'rm -f "$tmp"' EXIT
 
   http_code=$(curl -sS -o "$tmp" -w '%{http_code}' \
     -X POST \

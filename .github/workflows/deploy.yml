@@ -81,11 +81,18 @@ jobs:
 
       - name: Resolve commit range
         id: range
-        # On a normal push, github.event.before is the SHA just before
-        # the push and github.sha is the new tip. On workflow_dispatch
-        # or initial pushes we don't have a useful before — fall back
-        # to HEAD~1 so the deploy still does something sensible
-        # (push only the latest commit's items).
+        # Two cases:
+        #   1. Normal push: github.event.before is the SHA just before the
+        #      push, github.sha is the new tip. Use that range as-is.
+        #   2. No useful before (workflow_dispatch, or initial push where
+        #      github.event.before is all-zeros): fall back to HEAD~1 so the
+        #      deploy still pushes the latest commit's items.
+        #   3. Root commit on initial push (HEAD has no parent): there's
+        #      nothing earlier to diff against; setting before=after makes
+        #      changed-grid-items.sh produce an empty changeset, which the
+        #      deploy step then treats as a no-op. Acceptable for an empty-
+        #      tree first commit; if the root commit has real items, push
+        #      them by hand via `wmill <type> push` once before merging.
         run: |
           before="${{ github.event.before || '' }}"
           after="${{ github.sha }}"
@@ -94,7 +101,7 @@ jobs:
             if parent="$(git rev-parse --verify --quiet "${after}^")"; then
               before="$parent"
             else
-              # Root commit — nothing earlier to diff against.
+              # Root commit — see comment block above.
               before="$after"
             fi
           fi

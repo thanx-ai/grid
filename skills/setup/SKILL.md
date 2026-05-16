@@ -164,12 +164,16 @@ for rule in "$PLUGIN_RULES"/*.md; do
   case "$base" in
     README.md|reusable-workflow-meta-checkout.md|per-item-push-not-sync.md) continue ;;
   esac
-  # Prepend a managed-header. Idempotent: skip if already present.
-  if ! grep -q "Managed by grid plugin" "$rule"; then
-    printf '<!-- Managed by grid plugin. Re-run /grid:setup to refresh. -->\n\n' > "claude/rules/$base"
-    cat "$rule" >> "claude/rules/$base"
-  else
-    cp "$rule" "claude/rules/$base"
+  dest="claude/rules/$base"
+  # Idempotent: re-copy from the canonical source every run, then ensure the
+  # managed-header is present. Check the destination, not the source — the
+  # header lives on the destination side.
+  cp "$rule" "$dest"
+  if ! head -n 1 "$dest" | grep -q "Managed by grid plugin"; then
+    tmp="$(mktemp)"
+    printf '<!-- Managed by grid plugin. Re-run /grid:setup to refresh. -->\n\n' > "$tmp"
+    cat "$dest" >> "$tmp"
+    mv "$tmp" "$dest"
   fi
 done
 ```

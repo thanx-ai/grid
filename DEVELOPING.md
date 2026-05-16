@@ -96,7 +96,7 @@ After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md`
 
 ## Style conventions
 
-- Prose: "the Grid" lowercase-determiner. Exact strings preserved: `thanx-ai/grid` (repo), `thanx-grid` (plugin), `# The Grid` (README title).
+- Prose: "the Grid" lowercase-determiner. Exact strings preserved: `thanx-ai/grid` (repo), `grid` (plugin name), `# The Grid` (README title). The plugin previously shipped as `thanx-grid` — don't reintroduce that name.
 - Slack: `#ai-help-desk` for all access/help/bug questions. There is no `#eng-platform` channel.
 - GitHub: `@eng-platform` is the review team.
 - Skill `description:` frontmatter must include trigger phrases the user is likely to type (e.g. "set up grid", "bootstrap grid in this repo").

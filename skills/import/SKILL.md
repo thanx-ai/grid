@@ -15,16 +15,15 @@ Three accepted source types:
 2. **Local project directory** — absolute or `~`-relative path containing `package.json`.
 3. **Single self-contained HTML file** — a `.html` file (or `file:///…` URL) with inline `<style>` and `<script>` blocks and **no relative `<script src=...>` siblings**. The skill extracts the styles into `index.css`, the body into `App.tsx`, and any large hardcoded data blob in the script (e.g. `const CUBE = {…}`) into a backend Windmill script. Use this when someone shares a stand-alone HTML dashboard, prototype, or report and asks for it to land in the workspace. See Step 1 → "Source mode HTML" for shape requirements and Step 8 → "HTML source transforms" for the conversion rules.
 
-Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. All three source types produce the same on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the root, `backend/` for runnables) — see the **Apps** section of `CLAUDE.md` for the canonical layout and `claude/rules/raw-app-wmill-virtual.md` / `claude/rules/raw-app-inline-runnable-yaml.md` / `claude/rules/raw-app-from-html.md` for the gotchas that have already bitten us.
+Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. The on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the directory root, `backend/` subdirectory for runnables) is described in `claude/rules/raw-app-wmill-virtual.md`, `claude/rules/raw-app-inline-runnable-yaml.md`, and `claude/rules/raw-app-from-html.md`. Those three rules also document the gotchas that have already bitten us.
 
 ## When NOT to use
 
-- The source is a Next.js, Remix, Astro, SvelteKit, or any other SSR/SSG project — Windmill raw_apps are SPA-only static bundles. Refuse and tell the user (see Step 2).
-- The source is a monorepo root (multiple `packages/`, `apps/`, `lerna.json`, `pnpm-workspace.yaml`, `turbo.json`) — point the user at a specific app subpath via `#<subpath>` instead.
-- The source isn't a frontend app — backend services, CLIs, libraries belong in `<SCOPE>/<name>.ts` (script) or a flow, not a raw_app.
 - The app already exists in this repo — edit the files directly.
-- **HTML source: the file references relative sibling files** (`<script src="./app.js">`, `<link href="./styles.css">`, `<img src="./logo.png">`). That's a multi-file static site, not a self-contained HTML. Either zip it into a project dir with a `package.json` (use source type 2) or have the user pre-bundle to a true single-file HTML first.
-- **HTML source: the file is server-rendered output** (contains `__NEXT_DATA__`, `__SAPPER__`, `__NUXT__`, `<!--$-->`/`<!--/$-->` React stream markers, or `data-react-stream-root` attributes). That's a hydration payload, not an authored SPA. Refuse — the original SSR project is the right import target, not its rendered output.
+- A single backend file (Node CLI, Python script, SQL query) — use source mode `script` (see Step 1) instead. That produces a `*.script.ts` Windmill item, not a raw_app.
+- A Claude Code skill/plugin repo (`.claude/commands/*.md` at root, no SPA framework in `package.json`) — there's no runtime to deploy. Step 2's compatibility assessment flags this and points you at source mode `script` if there's a specific file worth porting.
+
+**For everything else** — Next.js / Remix / Astro / SvelteKit / Nuxt, Tailwind, monorepo roots, websocket apps, Flask/Express/FastAPI servers, Supabase/Streamlit/Cloudflare-Worker projects — **the skill does not refuse**. Step 2 (Compatibility assessment) detects the signal, names the Grid-supported replacement tech (e.g. Next.js → plain React + client router, Tailwind → vanilla CSS, Flask → decomposed Windmill scripts), lists the surgery, and lets you choose to **proceed** (do the surgery, scaffold what's ready now) or **bail with `GRID_MIGRATION.md`** (write the plan to disk, exit, re-run after surgery). The only hard stops are credentials in the source, 5 MB+ binary HTML blobs, and source-mode misclassification — everything else gets a migration plan.
 
 ## Step 1: Parse the source argument
 
@@ -147,7 +146,7 @@ If the migration-item list is **non-empty**, render a summary to the user with e
 > What do you want to do?
 >
 > 1. **Proceed** — I've already done (or will do) this surgery. Scaffold what `/grid:import` can produce now; mark the remaining work as TODOs in the output.
-> 2. **Bail with `GRID_MIGRATION.md`** — write this plan to `GRID_MIGRATION.md` in the destination directory and stop; I'll do the surgery in a separate pass and re-run `/grid:import` after.
+> 2. **Bail with `GRID_MIGRATION.md`** — write this plan to `GRID_MIGRATION.md` at the project repo root and stop; I'll do the surgery in a separate pass and re-run `/grid:import` after.
 
 If the user picks **Proceed**: continue to Step 3. Throughout the remaining steps, every place a migration item would have changed the output, add a `// TODO(grid-migration): <surgery>` marker so the gap is visible in the resulting files. The Report in Step 11 lists every TODO.
 

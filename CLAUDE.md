@@ -122,7 +122,7 @@ When making changes, route by purpose:
 - Plugin skills live at `skills/<name>/SKILL.md`. The filename is fixed; the directory name is the skill name.
 - Scripts use `bash`, are `set -euo pipefail`, and pass shellcheck. No silent fallbacks — fail loud.
 - Workflow YAML files use 2-space indent. Inputs and secrets are explicitly typed and described.
-- "the Grid" in prose; `thanx-ai/grid` and `thanx-grid` are exact strings preserved as-is.
+- "the Grid" in prose; `thanx-ai/grid` (repo slug) and `grid` (plugin name) are exact strings preserved as-is. The plugin used to be called `thanx-grid` — don't reintroduce that name.
 - Help / access questions: `#ai-help-desk` Slack channel. The GitHub team reviewer is `@eng-platform` (it exists as a GitHub team; the Slack channel of that name does not).
 
 ## Capture friction as rules
