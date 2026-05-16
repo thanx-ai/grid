@@ -136,7 +136,16 @@ For everything else, run the table below against the source's `package.json`, ro
 
 If the migration-item list is **empty**, skip the assessment prompt and continue to Step 3.
 
-If the migration-item list is **non-empty**, render a summary to the user with every item's fields, then ask via `AskUserQuestion`:
+**Special case — sole Claude-skill-repo item.** If the migration-item list contains exactly one item AND that item is the Claude-skill-repo signal (`.claude/commands/*.md` etc.), there's nothing for the Proceed branch to scaffold (no `package.json` SPA, no `App.tsx`, no `backend/` runnables). Replace the standard prompt with:
+
+> Found 1 compatibility item: this repo is a Claude Code skill/plugin, not a webapp. There's no raw_app to produce here.
+>
+> What do you want to do?
+>
+> 1. **Re-run with a single script** — name a specific `.js`/`.ts` file inside this repo to port. The skill re-enters in source mode `script` against that file.
+> 2. **Bail with `GRID_MIGRATION.md`** — write a one-item plan to `GRID_MIGRATION.md` at the project repo root and stop.
+
+Otherwise — the migration-item list is non-empty and includes anything other than just the Claude-skill row — render a summary with every item's fields, then ask via `AskUserQuestion`:
 
 > Found N compatibility items requiring migration before this source can land on the Grid:
 >
@@ -151,6 +160,8 @@ If the migration-item list is **non-empty**, render a summary to the user with e
 If the user picks **Proceed**: continue to Step 3. Throughout the remaining steps, every place a migration item would have changed the output, add a `// TODO(grid-migration): <surgery>` marker so the gap is visible in the resulting files. The Report in Step 11 lists every TODO.
 
 If the user picks **Bail with `GRID_MIGRATION.md`**: write the migration plan to `GRID_MIGRATION.md` at the project repo root (NOT inside any `.raw_app/` — the user hasn't picked a scope yet). The plan content is the same item list rendered as markdown, plus a "Re-run when ready" footer. Then clean up (`[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`) and exit.
+
+If the user picks **Re-run with a single script** (only offered for the sole-Claude-skill-repo case): prompt for the file path, validate it exists and matches the `.js`/`.ts`/`.mjs`/`.cjs` source-mode-`script` shape, then restart the skill at Step 1 with that path as the new source argument.
 
 ### `GRID_MIGRATION.md` shape
 
@@ -306,7 +317,7 @@ A single `.html` file has a different shape — there's nothing to "probe" becau
 | Every `<style>…</style>` block in `<head>`              | `index.css`                                             | Concatenate in source order. Strip any `@import url('https://fonts…')` lines — esbuild can warn on remote `@import url(…)` in CSS; inject the `<link>` from `index.tsx` instead (see Step 8 → "Remote font imports").                                                                                                                                                           |
 | `<body>…</body>` minus the closing `<script>` blocks    | `App.tsx` (JSX)                                         | Manual conversion — `class=` → `className=`, `for=` → `htmlFor=`, `onclick="fn()"` → `onClick={fn}`, self-closing tags need `/>`, inline `style="color:red"` → `style={{ color: "red" }}`.                                                                                                                                                                                      |
 | `<script src="https://…">` tags in `<head>` or `<body>` | `package.json` dep, or `index.tsx` `<script>` injection | Try to map each CDN script to its npm equivalent (e.g. `https://cdn.plot.ly/plotly-2.27.0.min.js` → `plotly.js-basic-dist-min`). Prefer npm — bundled, tree-shakeable, typed. Fall back to runtime `<script>` injection in `index.tsx` only when no usable npm package exists.                                                                                                  |
-| Inline `<script>…</script>` blocks (no `src`)           | `App.tsx` + backend script (per Step 7b)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7b → HTML-specific call sites. |
+| Inline `<script>…</script>` blocks (no `src`)           | `App.tsx` + backend script (per Step 7c)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7c → HTML-specific call sites. |
 
 Pick the `#root` mount as you would for any other source. The original HTML likely has no mount selector — the body itself is the canvas. Windmill mounts into `#root`; you'll create that mount in `index.tsx`.
 

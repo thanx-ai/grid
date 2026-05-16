@@ -35,6 +35,8 @@ Windmill exposes a workspace-scoped private npm proxy at `/w/<workspace>/npm_pro
 //grid-origin.thanx.com/api/w/thanx/npm_proxy/:_authToken=${WINDMILL_NPM_TOKEN}
 ```
 
+**Token discipline.** The `${WINDMILL_NPM_TOKEN}` must remain an env-var reference and **never** be replaced with a literal token. The repo-root `.gitignore` ignores `.npmrc`, but `*/.raw_app/.npmrc` is nested — it does **not** match the root pattern and would commit if a literal token is ever inlined. If a project repo ever needs a literal token here (e.g. local CI testing), add `**/.npmrc` to that repo's `.gitignore` first.
+
 The publishing side (how `@thanx/react@1.4.0` gets into the workspace proxy) lives in the design-system repo, not in project repos consuming it. Until that publish pipeline exists, fall back to the vendor path.
 
 **Path forward** — the design-system repo is on the to-do list to wire `npm publish` into its own GH Action targeting the workspace proxy. Track the work and switch to the registry path once it's live.

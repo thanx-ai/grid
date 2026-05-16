@@ -160,21 +160,26 @@ If none resolve, ask the user where their `grid` plugin is installed and use tha
 Then copy each rule file (skip `README.md`, skip files whose name suggests they're meta-repo-internal — e.g. `reusable-workflow-meta-checkout.md`):
 
 ```bash
-mkdir -p claude/rules
+repo_root="$(git rev-parse --show-toplevel)"
+rules_dir="$repo_root/claude/rules"
+mkdir -p "$rules_dir"
 for rule in "$PLUGIN_RULES"/*.md; do
   base=$(basename "$rule")
   case "$base" in
     README.md|reusable-workflow-meta-checkout.md|per-item-push-not-sync.md|wmill-sync-includes-flag.md) continue ;;
   esac
-  dest="claude/rules/$base"
-  # Idempotent: re-copy from the canonical source every run, then ensure the
-  # managed-header is present. Check the destination, not the source — the
-  # header lives on the destination side.
+  dest="$rules_dir/$base"
+  # Always overwrite from canonical source — these are managed files, not
+  # user content. The managed-header on line 1 tells humans not to edit.
   cp "$rule" "$dest"
   if ! head -n 1 "$dest" | grep -q "Managed by grid plugin"; then
     # mktemp in the destination's directory so the subsequent `mv` is
     # same-filesystem (avoids EXDEV when /tmp is tmpfs and the repo isn't).
-    tmp="$(mktemp "claude/rules/.tmp.XXXXXX")"
+    # Absolute path so the call works regardless of cwd.
+    tmp="$(mktemp "$rules_dir/.tmp.XXXXXX")" || {
+      echo "mktemp failed in $rules_dir" >&2
+      exit 1
+    }
     printf '<!-- Managed by grid plugin. Re-run /grid:setup to refresh. -->\n\n' > "$tmp"
     cat "$dest" >> "$tmp"
     mv "$tmp" "$dest"
@@ -247,4 +252,4 @@ Walk the user through confirming their token actually works against the Grid bef
 
 ## Idempotency
 
-This skill should be safe to re-run on a repo that's already been bootstrapped — it refreshes the bundled rules, leaves user content untouched, and asks before overwriting `wmill.yaml` or `.github/workflows/grid.yml`. If `claude/rules/<name>.md` already exists, compare the content against the plugin's source and re-copy only if the managed-header is missing or the content has drifted from the canonical version.
+This skill should be safe to re-run on a repo that's already been bootstrapped — it refreshes the bundled rules, leaves user content untouched, and asks before overwriting `wmill.yaml` or `.github/workflows/grid.yml`. The `claude/rules/<name>.md` managed files are **always** re-copied from the canonical plugin source on every run (the file is for the plugin to maintain, not for users to edit — that's what the managed-header at line 1 signals). User-written rule files in the same directory are left alone, since the loop only iterates over names that already exist in the plugin source.

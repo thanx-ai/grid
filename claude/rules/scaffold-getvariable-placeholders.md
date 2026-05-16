@@ -18,7 +18,7 @@ The throw happens **at runtime, on every invocation** — there is no lint or ty
 - If a path is aspirational (no real consumer yet), delete the call. A TODO comment is enough.
 - If a path _should_ exist, create it in the Windmill UI (or via `wmill variable add`) **before** merging the script that reads it.
 
-The check only sees **literal string arguments**. Template strings like `getVariable(\`f/${env}/X\`)` are silently skipped — there's nothing to verify statically. Avoid computed paths in scaffolded code; if you need a computed path, write a deploy test (see [README → Deploy tests](../../README.md#deploy-tests)) that exercises the resolution at runtime.
+The check only sees **literal string arguments**. Template strings like `getVariable(\`f/${env}/X\`)` are silently skipped — there's nothing to verify statically. Avoid computed paths in scaffolded code; if you need a computed path, write a deploy test (see [`deploy-test-no-nested-job.md`](./deploy-test-no-nested-job.md)) that exercises the resolution at runtime.
 
 ## Why a typecheck doesn't help
 

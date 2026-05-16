@@ -93,7 +93,7 @@ That's it — merges to `master` deploy automatically.
 
 ## Adoption is opt-in and additive
 
-Projects already deploying via their own pipelines (e.g. `thanx-ai/merchant-health-dashboard`, `thanx-ai/thanx-strategy-workbook`) keep their existing workflows. The plugin adds files; it doesn't replace existing CI. Adopt the reusable workflows when you want to retire your own deploy plumbing — never as a forced migration.
+Projects already deploying via their own pipelines keep their existing workflows. The plugin adds files; it doesn't replace existing CI. Adopt the reusable workflows when you want to retire your own deploy plumbing — never as a forced migration.
 
 ## Where apps live
 

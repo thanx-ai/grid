@@ -19,15 +19,13 @@
 credentials*
 secrets*
 !secrets-template.*
-# Common SSH private key filenames + bare htpasswd
+# Common SSH private key filenames + bare htpasswd. The bare names cover
+# the private keys (the dangerous side); `id_*.pub` is left allowed since
+# public keys are safe to commit.
 id_rsa
-id_rsa.*
 id_ed25519
-id_ed25519.*
 id_ecdsa
-id_ecdsa.*
 id_dsa
-id_dsa.*
 .htpasswd
 
 # Node / runtime
@@ -41,6 +39,11 @@ node_modules/
 
 # Claude Code phase-chain artifacts (session-local)
 .context/
+
+# Managed-rule temp files written by `/grid:setup` Step 4's mktemp pattern.
+# Belt-and-braces: the script `mv`s them in place, but if it's interrupted
+# mid-flight (Ctrl-C, panic) the temp file is left behind.
+claude/rules/.tmp.*
 
 # Claude Code local-only state — team-shared content under .claude/
 # (settings.json, agents/, commands/) stays committed

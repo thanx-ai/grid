@@ -6,12 +6,12 @@ This is interim guidance — Windmill natively supports SQL script languages (Po
 
 ## Why this matters
 
-Two of the four repos reviewed at PR-time held SQL we'd want on the Grid:
+Two common shapes of "SQL we'd want on the Grid" show up in project repos:
 
-- `thanx-strategy-workbook/queries/*.sql` — Snowflake queries powering the strategic brief.
-- `merchant-health-dashboard/src/routes/*.py` — Python wrappers around Snowflake queries.
+- A `queries/*.sql` directory of Snowflake / Postgres / BigQuery SELECTs that power a dashboard or report.
+- Python or TypeScript wrappers under `src/routes/` (or similar) that hold the SQL strings inline and run them against a workspace DB.
 
-The TypeScript-wrapper pattern handles both cases uniformly: define a Windmill resource for the database (one per warehouse, workspace-wide), write a `*.script.ts` that imports the SQL string and runs it via the resource's client, return typed rows.
+The TypeScript-wrapper pattern handles both uniformly: define a Windmill resource for the database (one per warehouse, workspace-wide), write a `*.script.ts` that imports the SQL string and runs it via the resource's client, return typed rows.
 
 ## The pattern
 
