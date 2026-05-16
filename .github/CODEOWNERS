@@ -1,0 +1,9 @@
+# Every PR into this repo requires review from one of the listed owners.
+# More-specific rules below override the global default.
+
+* @drn @anutron
+
+# Deploy pipeline and repo-wide config — same owners for now.
+/.github/         @drn @anutron
+/CLAUDE.md        @drn @anutron
+/README.md        @drn @anutron

@@ -1,0 +1,48 @@
+name: Self-test
+
+# This repo's own CI — runs on every PR and push to master against
+# thanx-ai/grid itself. Doesn't touch any external Windmill workspace.
+#
+# What this proves:
+#   - The reusable workflow YAML is well-formed (actionlint).
+#   - Every shell script under scripts/ parses (bash -n) and has no
+#     shellcheck errors.
+#
+# What this does NOT prove (deferred to integration test against
+# thanx-ai/grid-examples):
+#   - The reusable workflows actually deploy items end-to-end.
+#   - The scripts work against a live Windmill workspace.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Bash syntax check
+        run: |
+          fail=0
+          for f in scripts/*.sh; do
+            echo "▶ bash -n $f"
+            bash -n "$f" || fail=1
+          done
+          exit $fail
+      - name: shellcheck
+        run: shellcheck scripts/*.sh

@@ -1,44 +1,66 @@
 # The Grid
 
-Reusable GitHub Actions workflows + a Claude Code plugin (`thanx-grid`) for teams shipping to **Grid** — Thanx's self-hosted [Windmill](https://windmill.dev) workspace at `https://grid.thanx.com`.
+Reusable GitHub Actions workflows + a Claude Code plugin (`grid`) for shipping to **Grid** — Thanx's self-hosted [Windmill](https://windmill.dev) workspace at `https://grid.thanx.com`.
 
-This repo is **not** where Grid code lives. It's the shared infrastructure that every team repo pulls in to deploy to the Grid. Team-shared dashboards, scripts, and flows live in each team's own GitHub repo (see [`thanx-ai/grid-examples`](https://github.com/thanx-ai/grid-examples) for the canonical reference).
+> **Public repository.** `thanx-ai/grid` ships as a public repo so individual project repos (which may themselves be private) can pull it in via `uses: thanx-ai/grid/...@<ref>` without needing GitHub App tokens for cross-repo workflow access. **Never** commit anything sensitive here: no tokens, no internal hostnames beyond `grid.thanx.com` / `grid-origin.thanx.com`, no real customer data, no `.env` files. The `.gitignore` and CI guards catch the obvious foot-guns; the rest is on us.
+
+This repo is **not** where Grid code lives. It's the shared infrastructure that individual project repos pull in to deploy to the Grid. Apps, scripts, and flows live in each person's own GitHub repo (see [`thanx-ai/grid-examples`](https://github.com/thanx-ai/grid-examples) for the canonical reference).
 
 ## What's here
 
 ### 1. Reusable GitHub Actions workflows
 
-Two workflows under `.github/workflows/` that team repos call via `uses:` from their own `.github/workflows/grid.yml`:
+Two workflows under `.github/workflows/` that project repos call via `uses:` from their own `.github/workflows/grid.yml`:
 
 - **`ci.yml`** — lints every `.raw_app/`, validates that every literal `wmill.getVariable("f/...")` reference resolves in the prod workspace.
-- **`deploy.yml`** — runs `wmill sync push --yes` against the Grid, then executes deploy tests.
+- **`deploy.yml`** — pushes each changed item individually with `wmill <type> push` (`app`, `script`, `flow`, `resource`, `variable`, `schedule`, `trigger`, `folder`). Each push is an upsert: it creates or updates the remote item but **never deletes** anything outside the changeset. Then executes deploy tests. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md) for why this isn't `wmill sync push`.
 
-### 2. The `thanx-grid` Claude Code plugin
+### 2. The `grid` Claude Code plugin
 
-Under `.claude-plugin/` and `skills/`. Provides:
+Under `.claude-plugin/` and `skills/`. Three slash commands, distinct jobs:
 
-- **`/thanx-grid:grid-setup`** — bootstrap a team repo (scaffolds `wmill.yaml`, `.github/workflows/grid.yml`, copies Grid conventions into `claude/rules/`).
-- **`/thanx-grid:new-app`** — scaffold a Windmill raw_app at the team repo's configured scope.
-- **`/thanx-grid:import-app`** — adopt an existing GitHub project or HTML dashboard as a raw_app.
-- **`/thanx-grid:promote`** — flip a repo from `u/<you>/` mode to `f/<dept>/` mode (rename items via the Windmill API, update YAML, open a PR).
+| Command            | When to use                                                                                                                                            | What it does                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`/grid:setup`**  | Once per project repo, right after `git init` (or when adopting Grid in an existing repo).                                                             | Scaffolds `wmill.yaml`, the `.github/workflows/grid.yml` workflow caller, walks you through minting the deploy token, and copies the Grid conventions into `claude/rules/`. If the repo already has app code that doesn't directly fit Grid (Next.js, Flask, Streamlit, …), also writes `GRID_MIGRATION.md` with a per-signal "what to change" checklist. Setup continues either way. **Repo-level** bootstrap. |
+| **`/grid:create`** | Each time you want to start a **new** raw_app from scratch.                                                                                            | Asks which scope folder (`f/company/` or `f/<dept>/`) the app should live in, then scaffolds the canonical raw_app layout with placeholder content you fill in. **App-level**, no existing source.                                                                                                                                                                                                              |
+| **`/grid:import`** | When you have **existing** code (GitHub URL, local project, single `.html` dashboard, or a single `.js`/`.ts` script) you want to bring onto the Grid. | Same per-app scope question as `/grid:create`. Runs a compatibility assessment first — if the source uses Next.js / Tailwind / websockets / submodules / etc., produces a migration plan naming the Grid-supported replacement tech and the surgery required. Then either scaffolds (if you've done the surgery) or writes `GRID_MIGRATION.md` and bails. **App-level**, existing source.                       |
 
-## Quickstart for team repos
+### Migration philosophy
 
-Create a new repo, then in a Claude Code session:
+A repo or source that doesn't fit Grid as-is is **not refused** — it gets a migration plan. The skills detect every signal that requires rework (Next.js → plain React + client router, Tailwind → vanilla CSS, Flask → decomposed Windmill scripts, Supabase → Windmill resources, websockets → drop or relocate, etc.), name the Grid-supported replacement tech, and list the per-signal surgery. The only hard stops are credential leaks (per security policy), 5 MB+ binary blobs in HTML sources, and source-mode misclassification (wrong tool for the source shape).
 
-```bash
-gh repo create thanx-ai/<your-team>-tools --private
-cd <your-team>-tools
-claude
-# then:
-/thanx-grid:grid-setup
+### Installing the plugin
+
+```text
+# In any Claude Code session:
+/plugin install thanx-ai/grid
 ```
 
-`grid-setup` will:
+That fetches the latest tagged release and installs it. Subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
 
-1. Ask whether the repo deploys to `u/<your-username>/` (personal) or `f/<dept>/` (team-shared).
-2. Scaffold `wmill.yaml`, `.github/workflows/grid.yml`, `folder.meta.yaml` (if team-shared), and copy the Grid conventions into `claude/rules/`.
-3. Walk you through minting a Windmill deploy token (`grid.thanx.com` → User → Account Settings → Tokens → New Token) and storing it as the `WINDMILL_DEPLOY_TOKEN` repo secret.
+To pin a specific version, install from a tag: `/plugin install thanx-ai/grid@v0.1.0`. To install from a feature branch you're testing: `/plugin install thanx-ai/grid@<branch>`.
+
+If the install command isn't recognised, your Claude Code is older than the plugin system release — upgrade Claude Code (`claude --version` should be ≥ the version called out in `#ai-help-desk` pinned messages), then retry.
+
+To uninstall: `/plugin uninstall grid`.
+
+## Quickstart
+
+Each person owns their own project repo. Create one, install the plugin, run `/grid:setup`:
+
+```bash
+gh repo create thanx-ai/<your-username>-grid --private
+cd <your-username>-grid
+claude
+# in the Claude Code session:
+/plugin install thanx-ai/grid
+/grid:setup
+```
+
+`/grid:setup` will:
+
+1. Scaffold `wmill.yaml`, `.github/workflows/grid.yml`, and copy the Grid conventions into `claude/rules/`.
+2. Walk you through minting a Windmill deploy token (`grid.thanx.com` → User → Account Settings → Tokens → New Token) and storing it as the `WINDMILL_DEPLOY_TOKEN` repo secret.
 
 The resulting `.github/workflows/grid.yml` looks like:
 
@@ -59,9 +81,10 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/master'
     needs: ci
+    # No `with: includes:` input — deploy.yml infers the set from the commit
+    # range and pushes each item with `wmill <type> push`. See
+    # claude/rules/per-item-push-not-sync.md.
     uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
-    with:
-      includes: "f/<your-dept>/**"
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 ```
@@ -70,16 +93,18 @@ That's it — merges to `master` deploy automatically.
 
 ## Adoption is opt-in and additive
 
-Teams already deploying via their own pipelines (e.g. `thanx-ai/merchant-health-dashboard`, `thanx-ai/thanx-strategy-workbook`) keep their existing workflows. The plugin adds files; it doesn't replace existing CI. Adopt the reusable workflows when you want to retire your own deploy plumbing — never as a forced migration.
+Projects already deploying via their own pipelines keep their existing workflows. The plugin adds files; it doesn't replace existing CI. Adopt the reusable workflows when you want to retire your own deploy plumbing — never as a forced migration.
 
-## Two namespaces
+## Where apps live
 
-Every team repo deploys to exactly one of:
+Every app you ship to the Grid lands in one of two folders, picked **per-app** based on use-case (not per-repo):
 
-- **`u/<your-username>/`** — personal sandbox. Private to one user. Default for prototypes.
-- **`f/<dept>/`** — team-shared. Workspace-wide read+run; dept-group write via SCIM. For shared dashboards and scripts.
+- **`f/company/`** — workspace-wide. Use when the app is genuinely cross-functional and everyone at Thanx should be able to find and run it.
+- **`f/<dept>/`** — department-scoped (`f/eng/`, `f/cs/`, `f/sales/`, …). Workspace-wide read+run; dept-group write via SCIM. Use when the app is owned by one team, even if other teams might occasionally read it.
 
-When a prototype matures, `/thanx-grid:promote` flips the repo from `u/` to `f/<dept>/`.
+Both folders are readable workspace-wide; the distinction is ownership and write access. Default to `f/<dept>/`; reach for `f/company/` only when an app truly belongs to no single department.
+
+A single project repo can ship apps to both folders — `/grid:create` asks each time.
 
 ## Versioning
 

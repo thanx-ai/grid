@@ -1,13 +1,13 @@
 ---
-name: import-app
-description: Import an existing React/Vue/Svelte SPA from a GitHub URL, a local project path, or a single self-contained HTML file into a Windmill raw_app. Reads the target namespace from this repo's `wmill.yaml` (`u/<you>/` or `f/<dept>/`) — run `/thanx-grid:grid-setup` first if there's no `wmill.yaml`. Use when the user says "import app", "bring in an app from <repo>", "convert this project to a raw_app", "encode <github-url> as a Windmill app", or "import this html dashboard".
+name: import
+description: Adopt an EXISTING React/Vue/Svelte SPA (from a GitHub URL, a local project directory, or a single self-contained HTML file) into a Windmill raw_app in this project repo. Transforms the source — strips inert files, rewires API calls to `wmill.backend.<runnableId>(args)`, extracts inline data blobs into backend scripts — rather than copying it verbatim. **Sibling skill to `/grid:create`**, which scaffolds an empty placeholder app. Run `/grid:setup` first if there's no `wmill.yaml`. Use when the user says "import app", "bring in an app from <repo>", "convert this project to a raw_app", "encode <github-url> as a Windmill app", or "import this html dashboard".
 ---
 
-# import-app
+# import
 
 Adopt an existing single-page-app into the canonical Windmill raw_app layout.
 
-**Path convention used throughout this skill.** Examples below write `<SCOPE>/<name>.raw_app/` — `<SCOPE>` is resolved from this repo's `wmill.yaml` `includes:` glob (`u/<your-username>` or `f/<dept>`). Step 3 reads and validates it; every other step uses the substitution unchanged.
+**Path convention used throughout this skill.** Examples below write `<SCOPE>/<name>.raw_app/` — `<SCOPE>` is the per-app scope folder picked in Step 3 (`f/company/` or `f/<dept>/`). Every other step uses the `<SCOPE>` substitution unchanged.
 
 Three accepted source types:
 
@@ -15,38 +15,46 @@ Three accepted source types:
 2. **Local project directory** — absolute or `~`-relative path containing `package.json`.
 3. **Single self-contained HTML file** — a `.html` file (or `file:///…` URL) with inline `<style>` and `<script>` blocks and **no relative `<script src=...>` siblings**. The skill extracts the styles into `index.css`, the body into `App.tsx`, and any large hardcoded data blob in the script (e.g. `const CUBE = {…}`) into a backend Windmill script. Use this when someone shares a stand-alone HTML dashboard, prototype, or report and asks for it to land in the workspace. See Step 1 → "Source mode HTML" for shape requirements and Step 8 → "HTML source transforms" for the conversion rules.
 
-Companion to `/new-app`. `new-app` scaffolds an empty placeholder; `import-app` adapts existing code. All three source types produce the same on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the root, `backend/` for runnables) — see the **Apps** section of `CLAUDE.md` for the canonical layout and `claude/rules/raw-app-wmill-virtual.md` / `claude/rules/raw-app-inline-runnable-yaml.md` / `claude/rules/raw-app-from-html.md` for the gotchas that have already bitten us.
+Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. The on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the directory root, `backend/` subdirectory for runnables) is described in `claude/rules/raw-app-wmill-virtual.md`, `claude/rules/raw-app-inline-runnable-yaml.md`, and `claude/rules/raw-app-from-html.md`. Those three rules also document the gotchas that have already bitten us.
 
 ## When NOT to use
 
-- The source is a Next.js, Remix, Astro, SvelteKit, or any other SSR/SSG project — Windmill raw_apps are SPA-only static bundles. Refuse and tell the user (see Step 2).
-- The source is a monorepo root (multiple `packages/`, `apps/`, `lerna.json`, `pnpm-workspace.yaml`, `turbo.json`) — point the user at a specific app subpath via `#<subpath>` instead.
-- The source isn't a frontend app — backend services, CLIs, libraries belong in `<SCOPE>/<name>.ts` (script) or a flow, not a raw_app.
 - The app already exists in this repo — edit the files directly.
-- **HTML source: the file references relative sibling files** (`<script src="./app.js">`, `<link href="./styles.css">`, `<img src="./logo.png">`). That's a multi-file static site, not a self-contained HTML. Either zip it into a project dir with a `package.json` (use source type 2) or have the user pre-bundle to a true single-file HTML first.
-- **HTML source: the file is server-rendered output** (contains `__NEXT_DATA__`, `__SAPPER__`, `__NUXT__`, `<!--$-->`/`<!--/$-->` React stream markers, or `data-react-stream-root` attributes). That's a hydration payload, not an authored SPA. Refuse — the original SSR project is the right import target, not its rendered output.
+- A single backend file (Node CLI, Python script, SQL query) — use source mode `script` (see Step 1) instead. That produces a `*.script.ts` Windmill item, not a raw_app.
+- A Claude Code skill/plugin repo (`.claude/commands/*.md` at root, no SPA framework in `package.json`) — there's no runtime to deploy. Step 2's compatibility assessment flags this and points you at source mode `script` if there's a specific file worth porting.
+
+**For everything else** — Next.js / Remix / Astro / SvelteKit / Nuxt, Tailwind, monorepo roots, websocket apps, Flask/Express/FastAPI servers, Supabase/Streamlit/Cloudflare-Worker projects — **the skill does not refuse**. Step 2 (Compatibility assessment) detects the signal, names the Grid-supported replacement tech (e.g. Next.js → plain React + client router, Tailwind → vanilla CSS, Flask → decomposed Windmill scripts), lists the surgery, and lets you choose to **proceed** (do the surgery, scaffold what's ready now) or **bail with `GRID_MIGRATION.md`** (write the plan to disk, exit, re-run after surgery). The only hard stops are credentials in the source, 5 MB+ binary HTML blobs, and source-mode misclassification — everything else gets a migration plan.
 
 ## Step 1: Parse the source argument
 
 The skill accepts an optional argument in one of these forms:
 
 **GitHub URL** (source mode `github`):
+
 - `https://github.com/owner/repo` — clones via `git clone --depth 1`.
 - `https://github.com/owner/repo#branch` — clones that branch.
 - `https://github.com/owner/repo#path/to/subdir` — clones the repo, then operates on the subdir (use this for monorepos — point at the specific app dir).
 - `https://github.com/owner/repo#branch:path/to/subdir` — both.
 
 **Local project directory** (source mode `dir`):
+
 - An absolute or `~`-relative path to a directory — used directly, no clone.
 
 **Single HTML file** (source mode `html`):
+
 - `file:///absolute/path/to/file.html` — strip the `file://` prefix, validate the local path.
 - A plain absolute or `~`-relative path ending in `.html` or `.htm`.
 - Used directly, no clone. The file is treated as the entire source — no sibling files are read.
 
-If no argument was provided, ask the user with a plain text message (not `AskUserQuestion` — that tool requires 2-4 enumerated options and isn't suitable for free-form input). Wait for their reply. Mention all three accepted forms in the prompt.
+**Single Node script** (source mode `script`):
 
-Pick the source mode from the argument shape: starts with `https://github.com/` → `github`; ends in `.html`/`.htm` (or is a `file://` URL pointing at one) → `html`; otherwise → `dir`. Steps 2, 6, 7, and 8 branch on this; later steps are mostly mode-agnostic.
+- A plain absolute or `~`-relative path ending in `.js`, `.ts`, `.mjs`, or `.cjs`.
+- Used when the source is one CLI / helper file (e.g. `scripts/foo.js` from a tools repo) that should land as a Windmill `.script.ts`, not a `.raw_app/`. The output is a single `<scope>/<name>.script.ts` plus an optional `<scope>/<name>.script.yaml` sibling for metadata.
+- No clone, no `package.json` discovery — the file's own `import`/`require` statements are read and the deps are reconstructed into the script's lockfile metadata. Imports that don't have a clear Bun/Deno-compatible equivalent (Node-only built-ins like `child_process`, `fs/promises` with relative paths, etc.) are flagged for the user, not silently rewritten.
+
+If no argument was provided, ask the user with a plain text message (not `AskUserQuestion` — that tool requires 2-4 enumerated options and isn't suitable for free-form input). Wait for their reply. Mention all four accepted forms in the prompt.
+
+Pick the source mode from the argument shape: starts with `https://github.com/` → `github`; ends in `.html`/`.htm` (or is a `file://` URL pointing at one) → `html`; ends in `.js`/`.ts`/`.mjs`/`.cjs` → `script`; otherwise → `dir`. Steps 2, 6, 7, and 8 branch on this; later steps are mostly mode-agnostic.
 
 Validate the source:
 
@@ -64,7 +72,7 @@ If the fragment `#…` contains a `:` (e.g. `#main:apps/web`), split on the firs
 
 After resolving, verify the final operating directory is still inside `$CLONE_DIR`: `case "$(cd "$CLONE_DIR/$subpath" 2>/dev/null && pwd -P)" in "$(cd "$CLONE_DIR" && pwd -P)"/*|"$(cd "$CLONE_DIR" && pwd -P)") ;; *) echo "subpath escapes clone dir" >&2; exit 1 ;; esac`. If this fails, refuse and run Step 10 cleanup.
 
-For GitHub URLs, capture `CLONE_DIR=$(mktemp -d -t import-app.XXXXXX)` and run `git clone --depth 1 [--branch "<branch>"] -- "<url-without-fragment>" "$CLONE_DIR"`. **Quote both the branch and the URL**, and use `--` to end git's option parsing — together these defang branch names starting with `-` (which would otherwise be interpreted as git flags) and shell-special characters in either field. Before running, validate the branch matches `^[A-Za-z0-9._/-]+$` and reject anything else. Treat `$CLONE_DIR` (plus any subpath) the same as a local path from here on. If the clone is private and auth-required, the `git clone` call will fail — tell the user to either clone locally and re-run the skill with the local path, or set up GitHub credentials via the `gh` CLI (`gh auth login`) before retrying.
+For GitHub URLs, capture `CLONE_DIR=$(mktemp -d -t grid-import.XXXXXX)` and run `git clone --depth 1 [--branch "<branch>"] -- "<url-without-fragment>" "$CLONE_DIR"`. **Quote both the branch and the URL**, and use `--` to end git's option parsing — together these defang branch names starting with `-` (which would otherwise be interpreted as git flags) and shell-special characters in either field. Before running, validate the branch matches `^[A-Za-z0-9._/-]+$` and reject anything else. Treat `$CLONE_DIR` (plus any subpath) the same as a local path from here on. If the clone is private and auth-required, the `git clone` call will fail — tell the user to either clone locally and re-run the skill with the local path, or set up GitHub credentials via the `gh` CLI (`gh auth login`) before retrying.
 
 For source mode `html`, there is no clone — `$CLONE_DIR` stays unset, and Step 10 cleanup only has the (failure-only) destination removal to do. All later steps read directly from the absolute path resolved here; treat it as the entire source tree.
 
@@ -72,58 +80,184 @@ For source mode `html`, there is no clone — `$CLONE_DIR` stays unset, and Step
 
 **Cleanup obligation.** On every exit path — success, failure, refused source, credential match, framework refusal, lint failure, user cancellation of any `AskUserQuestion`, or any other early termination — run Step 10. Use `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"` to avoid an empty-variable `rm -rf` accident. If the user cancels a prompt mid-flow, do not just stop — run Step 10 first, then report the abort. The same applies to any other premature exit.
 
-## Step 2: Detect bad-fit structures and refuse early
+## Step 2: Compatibility assessment
 
-For source modes `github` and `dir`: read the source's `package.json` and look for SSR/SSG/monorepo signals **before** asking any more questions — refusing early saves the user three prompts. For source mode `html`: skip this table entirely (no `package.json` to read) and apply the **HTML-source bad-fit checks** below instead.
+Detect every signal that means "this source as-is doesn't fit a raw_app". **Don't refuse outright** — produce a per-signal migration plan naming the current tech, the Grid-supported replacement, and the surgery the user has to perform. Then let the user decide: **proceed** (some or all of the surgery has been or will be done; scaffold what's scaffoldable now and mark the rest as TODOs) or **bail with `GRID_MIGRATION.md`** (write the plan to disk and exit cleanly).
 
-Hard refusals (stop with a clear message naming the signal):
+The only paths through this step that exit _without_ a migration plan are the three hard stops at the top — credentials, oversized binary blobs, or a wrong-shape input (source-mode mismatch). Every other signal becomes a migration item.
 
-| Signal                                                                                                                                                                                                                                     | Where to look                     | Why we refuse                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `next` in deps                                                                                                                                                                                                                             | `package.json`                    | Next.js needs a Node server / edge runtime; raw_apps are static SPA bundles.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `@remix-run/*` in deps                                                                                                                                                                                                                     | `package.json`                    | Remix is SSR.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `astro` in deps                                                                                                                                                                                                                            | `package.json`                    | Astro is hybrid SSR by default.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `@sveltejs/kit` in deps                                                                                                                                                                                                                    | `package.json`                    | SvelteKit is SSR.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `nuxt` in deps                                                                                                                                                                                                                             | `package.json`                    | Nuxt is SSR.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `pnpm-workspace.yaml`, `lerna.json`, `turbo.json` at root, or `"workspaces"` field in `package.json`                                                                                                                                       | repo root                         | Monorepo — needs a specific subpath.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| No `react`, `react-dom`, `vue`, or `svelte` in deps                                                                                                                                                                                        | `package.json`                    | Not a SPA we can map to a raw_app framework.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `tailwindcss` in `dependencies` OR `devDependencies` (Tailwind is almost always a devDep), `tailwind.config.*` at root, `postcss.config.*` at root, `@tailwind` directives in any CSS, or `@import "tailwindcss"` (Tailwind v4) in any CSS | `package.json` + root + CSS files | Windmill's esbuild bundle does **not** run a PostCSS pipeline. `@tailwind` directives ship as raw strings and produce esbuild warnings (CI-fatal per `scripts/lint-raw-apps.sh`, which fails the build on any `[WARNING]`). Refuse with the options for the user: (a) pre-process Tailwind locally and commit the compiled CSS instead, (b) rewrite the styles as plain CSS / CSS variables (matches the example_dashboard / example_irl pattern), (c) wait for Windmill to add PostCSS support. Do **not** silently copy a Tailwind project — the bundle will lint-fail. Same logic applies to SCSS/Sass (`*.scss`, `sass` in `dependencies` OR `devDependencies`) and CSS modules with `.module.css` imports. |
+### Hard stops (refuse, no migration plan)
 
-When refusing, name the file/dep that triggered it (e.g. "found `next@14.2.3` in `package.json` — Windmill raw_apps are SPA-only static bundles, Next.js needs an SSR runtime") and, where applicable, suggest the fix: `"#path/to/app"` for monorepos, or rewriting the app as a SPA first.
+These short-circuit before the migration assessment runs because no migration plan is meaningful:
 
-### HTML-source bad-fit checks (source mode `html` only)
+| Signal                                                                                                                          | How to check                                                                                                            | Why it's a hard stop                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Credentials in the source (AWS, GitHub, Slack, OpenAI, Anthropic, etc.)                                                         | See Step 7a's exact grep                                                                                                | Per org security policy, stop immediately and route the user to `#ai-help-desk` + key rotation before doing anything else. The migration question is irrelevant until the credential is rotated and the upstream history scrubbed. |
+| Source-mode `html` file is > 5 MB                                                                                               | `[ $(wc -c < <file>) -gt 5242880 ]`                                                                                     | Almost always inlined binaries (images / fonts) that won't transform cleanly. Ask the user to externalize the binaries first, then re-run.                                                                                         |
+| Source-mode `html` file references **relative sibling files** (`<script src="./…">`, `<link href="./…">`, `<img src="./…">`)    | `grep -E '(src\|href)=["'"'"'](\\./\|/)' <file>` (CDN `https://…` URLs are fine)                                        | This isn't a self-contained HTML — it's the entry point of a multi-file static site. Point the user at source mode `dir` instead; no transformation is possible without the sibling files.                                         |
+| Source-mode `html` file contains SSR hydration markers (`__NEXT_DATA__`, `__SAPPER__`, `__NUXT__`, `data-react-stream-root`, …) | `grep -E '__NEXT_DATA__\|__SAPPER__\|__NUXT__\|<!--\\$-->\|<!--/\\$-->\|data-react-stream-root\|data-svelte-h=' <file>` | This is rendered output from an SSR framework, not an authored SPA — the original upstream project is the right import target. Tell the user to point at that source instead.                                                      |
 
-Run these on the imported `.html` file before continuing. Refuse on the first match:
+On any hard stop: print the trigger, clean up (`[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`), and exit. **Don't** write a `GRID_MIGRATION.md` for a hard stop — the user needs a different starting point, not a plan.
 
-| Signal | How to check | Why we refuse |
-| --- | --- | --- |
-| Relative or root-absolute `<script src=…>`, `<link href=…>`, `<img src=…>` | `grep -E '(src\|href)=["'"'"'](\\./\|/)' <file>` (excludes CDN `https://…`) | The file isn't self-contained — it's the entry point of a multi-file static site. Either zip the whole directory and re-run as source mode `dir`, or have the user pre-bundle to a true single-file build first. |
-| SSR/hydration markers | `grep -E '__NEXT_DATA__\|__SAPPER__\|__NUXT__\|<!--\\$-->\|<!--/\\$-->\|data-react-stream-root\|data-svelte-h=' <file>` | This is rendered output from an SSR framework, not an authored SPA. The original Next.js / SvelteKit / Nuxt project is the right import target; refuse and tell the user to point at that. |
-| Heavy framework signals embedded inline | `grep -E 'window.__VUE__\|window.__NUXT__\|window.__INITIAL_STATE__\|<div id="__next">' <file>` | Same as above — pre-rendered framework output, not authorable. |
-| Inline `<script type="importmap">` | `grep -E 'type="importmap"' <file>` | Import maps drive runtime ES module resolution from a manifest. esbuild has no concept of them; the bundle will fail to find the imports at build time. Refuse and tell the user to commit to a normal bundler-driven project first. |
-| File size > 5 MB | `[ $(wc -c < <file>) -gt 5242880 ]` | Likely contains embedded binaries (images base64'd into `src="data:…"`, fonts, etc.) that won't transform cleanly. Refuse and ask the user to externalize the binaries first, or point at the upstream project. |
+### Migration assessment
 
-If the HTML uses `<script type="module">` with **inline** content (no `src`), that's fine — port to `index.tsx` / `useEffect` blocks in Step 8.
+For everything else, run the table below against the source's `package.json`, root files, and CSS. For each row that matches, collect a **migration item** with these fields:
+
+- **Detected:** the exact file/dep/pattern that triggered it.
+- **Current tech:** what the source uses today.
+- **Grid tech:** the supported replacement.
+- **Surgery:** the specific work the user does (in concrete bullets, not vague advice).
+- **Automatable?** Whether `/grid:import` can do any of it now. Almost always **no** — this is the realistic floor; don't over-promise.
+
+| Signal                                                                                                                                     | Where to look                     | Migration plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `next` in deps, OR `next.config.{js,ts,mjs,cjs}`, `app/layout.tsx`, `pages/_app.{jsx,tsx}` at root                                         | `package.json` + repo root        | **Current:** Next.js (SSR / RSC / file-based routing). **Grid tech:** plain React (`react18`/`react19`) + a client-side router (e.g. `react-router-dom` or `@tanstack/react-router`). **Surgery:** drop `next` and `next.config.*`; flatten `app/layout.tsx` into a single client `App.tsx`; convert each `app/<route>/page.tsx` to a route component; replace `getServerSideProps` / RSC fetches with `wmill.backend.<runnableId>(args)` calls; replace API routes (`app/api/*/route.ts`) with `*.script.ts` items under the chosen scope; replace `next/image` with `<img>`, `next/link` with the router's `<Link>`. **Automatable:** no — manual rewrite per route.                                           |
+| `@remix-run/*` in deps OR `remix.config.{js,ts}`                                                                                           | `package.json` + repo root        | **Current:** Remix (SSR). **Grid tech:** plain React + client router; loader functions become `wmill.backend.<runnableId>(args)` calls. **Surgery:** mirror the Next.js plan above, route-by-route. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `@sveltejs/kit` in deps OR `svelte.config.*` importing `@sveltejs/kit/vite`                                                                | `package.json` + config           | **Current:** SvelteKit (SSR). **Grid tech:** plain Svelte 5 + client router (`svelte-spa-router`). **Surgery:** drop `@sveltejs/kit`, flatten `src/routes/+page.svelte` files into a single client tree, move `+page.server.ts` loaders into Windmill scripts. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `astro` in deps OR `astro.config.{js,mjs,ts}`                                                                                              | `package.json` + repo root        | **Current:** Astro (hybrid SSR/SSG). **Grid tech:** plain React or Svelte SPA. **Surgery:** drop `.astro` page format, port each page to a React/Svelte component; move any `getStaticProps`-style data into `*.script.ts` items. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `nuxt` in deps OR `nuxt.config.{js,ts}`                                                                                                    | `package.json` + repo root        | **Current:** Nuxt (SSR). **Grid tech:** plain Vue 3 + client router (`vue-router`). **Surgery:** drop Nuxt's pages/ directory and replace with a Vue Router config; move `useFetch` server data into Windmill scripts. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `tailwindcss` in any deps, `tailwind.config.*` / `postcss.config.*` at root, `@tailwind` / `@import "tailwindcss"` in any CSS              | `package.json` + root + CSS files | **Current:** Tailwind / PostCSS pipeline. **Grid tech:** plain CSS + CSS variables (Windmill's esbuild bundle has no PostCSS pipeline; `@tailwind` directives ship as raw strings and CI rejects the warnings). **Surgery:** (a) pre-process Tailwind locally and commit the compiled CSS, OR (b) rewrite as plain CSS / CSS variables (see `example_dashboard` / `example_irl` for the canonical pattern). **Automatable:** no — option (a) is mechanical but should be the user's choice.                                                                                                                                                                                                                      |
+| `*.scss` / `sass` dep OR `*.module.css` imports                                                                                            | source files                      | **Current:** Sass/SCSS or CSS Modules. **Grid tech:** plain CSS (same reason). **Surgery:** precompile or hand-convert. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `pnpm-workspace.yaml`, `lerna.json`, `turbo.json` at root, OR `"workspaces"` field in `package.json`                                       | repo root                         | **Current:** monorepo. **Grid tech:** N/A — `/grid:import` imports one app at a time. **Surgery:** re-run as `https://github.com/.../<repo>#<subpath>` pointing at the specific app directory. **Automatable:** no, but the skill should suggest the likely subpaths by listing the workspace `packages:` globs back to the user.                                                                                                                                                                                                                                                                                                                                                                                |
+| No `react`, `react-dom`, `vue`, or `svelte` in deps                                                                                        | `package.json`                    | **Current:** not a SPA — possibly a CLI, a library, or a server. **Grid tech:** depends. **Surgery:** if it's a single backend script, restart with source mode `script` (one `.js`/`.ts` file). If it's a multi-file backend (Flask, Express, FastAPI), each entry point becomes one `*.script.ts` / `.py`. If it's a library, it doesn't belong on Grid. **Automatable:** no — surface the verdict to the user.                                                                                                                                                                                                                                                                                                |
+| `.gitmodules` at repo root with active `[submodule "..."]`                                                                                 | repo root                         | **Current:** git submodule (typically pointing at a design-system repo). **Grid tech:** see `claude/rules/design-system-dep.md` — publish the package to the workspace npm proxy, or vendor the built artifacts into `<name>.raw_app/lib/`. **Surgery:** remove the submodule reference, switch the consuming `package.json` to either a registry version or a vendor-imported relative path. **Automatable:** no.                                                                                                                                                                                                                                                                                               |
+| `"<dep>": "file:..."` or `"<dep>": "link:..."` in `package.json`                                                                           | `package.json`                    | Same root cause + plan as `.gitmodules` above. `npm install` inside the `.raw_app/` can't reach sibling directories. See `claude/rules/design-system-dep.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ws`, `socket.io`, `socket.io-client`, `xterm`, `xterm-addon-*` in deps; OR `ws://` / `wss://` in any `vite.config.*` proxy block          | `package.json` + `vite.config.*`  | **Current:** websockets / streaming / xterm. **Grid tech:** none — Windmill HTTP routes are request/response only, no persistent connections. **Surgery:** either drop the websocket feature, or keep that specific surface outside Grid (a small ws server elsewhere) and have the raw_app poll it via HTTP. **Automatable:** no — this is an architectural decision.                                                                                                                                                                                                                                                                                                                                           |
+| `express`, `fastify`, `koa`, `hapi`, `nestjs` in `dependencies` (not just devDeps)                                                         | `package.json`                    | **Current:** long-running Node server. **Grid tech:** decomposed Windmill scripts — each route handler becomes one `*.script.ts` (typed inputs from the URL/body, return value is the JSON response). Schedules and triggers replace `cron`/`agenda` jobs. **Surgery:** list every route from `app.get(...)` / `app.post(...)` etc. and produce one script per route as a TODO checklist. **Automatable:** no — but listing the routes from grep is.                                                                                                                                                                                                                                                             |
+| `flask`, `fastapi`, `django` in `pyproject.toml` / `requirements.txt`                                                                      | Python config                     | Same plan as the Node server row above, with `*.script.py` items instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `.claude/commands/*.md`, `.claude/skills/*/SKILL.md`, or `.agent-builder-version` at root, AND no `react`/`vue`/`svelte` in `package.json` | repo root                         | **Current:** this is a Claude Code skill/plugin repo, not a web app — it has no deployable runtime surface. **Grid tech:** N/A. **Surgery:** if a specific `.js`/`.ts` CLI inside the repo is worth porting, re-run `/grid:import <path-to-that-file>` (source mode `script`). Otherwise this repo doesn't belong on Grid. **Automatable:** no — and there is no useful **Proceed** path. When this is the only migration item, the Step 2 prompt should offer **"Re-run with a single script"** (asks for the file path, then restarts in source-mode `script`) or **Bail with `GRID_MIGRATION.md`** instead of the usual Proceed/Bail pair. Picking Proceed with nothing to scaffold is not a meaningful path. |
+| `supabase`, `@supabase/*`, `firebase`, `mongodb`, `prisma`, `drizzle-orm` in deps                                                          | `package.json`                    | **Current:** Backend-as-a-Service or ORM coupled to a specific DB. **Grid tech:** Windmill **resources** (typed DB connections, defined workspace-wide) + scripts that take the resource as a typed param. **Surgery:** define a Windmill resource for the target DB; rewrite the data layer in `*.script.ts` items that accept `Resource<"postgresql">` (or similar) and return rows; the raw_app calls those via `wmill.backend.<runnableId>(args)`. **Automatable:** no — the resource creation is interactive in the Windmill UI.                                                                                                                                                                            |
+| `cloudflare-workers-types`, `wrangler.toml`, `_worker.js`                                                                                  | repo root                         | **Current:** Cloudflare Worker. **Grid tech:** Windmill scripts with HTTP routes. **Surgery:** port the `fetch` handler to a single `*.script.ts` whose `main()` takes a typed payload and returns the response shape; attach an HTTP trigger via `.trigger.yaml`. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `streamlit` in `pyproject.toml` / `requirements.txt`                                                                                       | Python config                     | **Current:** Streamlit (Python server rendering a webapp). **Grid tech:** raw_app (react18) for the UI + `*.script.py` items for the data layer. **Surgery:** hand-port each Streamlit widget to a React component; move `@st.cache_data` data loaders to Windmill scripts called from the raw_app. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Inline `<script type="importmap">` in HTML source                                                                                          | the `.html` file                  | **Current:** import maps drive runtime ES module resolution. **Grid tech:** esbuild bundling. **Surgery:** rewrite each importmap entry as a normal `import` statement against a bundler-resolvable package (npm dep or local file). **Automatable:** no.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Heavy framework signals embedded in an HTML source (`window.__VUE__`, `window.__INITIAL_STATE__`, `<div id="__next">`)                     | the `.html` file                  | **Current:** pre-rendered framework output, not authored source. **Grid tech:** plain React/Svelte/Vue (depending on the rendered framework). **Surgery:** find the upstream framework project and import from that source instead; if you really only have the rendered HTML, treat it as design reference and rewrite as a raw_app from scratch. **Automatable:** no.                                                                                                                                                                                                                                                                                                                                          |
+
+### Present the assessment to the user
+
+If the migration-item list is **empty**, skip the assessment prompt and continue to Step 3.
+
+**Special case — sole Claude-skill-repo item.** If the migration-item list contains exactly one item AND that item is the Claude-skill-repo signal (`.claude/commands/*.md` etc.), there's nothing for the Proceed branch to scaffold (no `package.json` SPA, no `App.tsx`, no `backend/` runnables). Replace the standard prompt with:
+
+> Found 1 compatibility item: this repo is a Claude Code skill/plugin, not a webapp. There's no raw_app to produce here.
+>
+> What do you want to do?
+>
+> 1. **Re-run with a single script** — name a specific `.js`/`.ts` file inside this repo to port. The skill re-enters in source mode `script` against that file.
+> 2. **Bail with `GRID_MIGRATION.md`** — write a one-item plan to `GRID_MIGRATION.md` at the project repo root and stop.
+
+Otherwise — the migration-item list is non-empty and includes anything other than just the Claude-skill row — render a summary with every item's fields, then ask via `AskUserQuestion`:
+
+> Found N compatibility items requiring migration before this source can land on the Grid:
+>
+> 1. `<detected>` → `<current tech>` becomes `<Grid tech>`. Surgery: `<bullets>`.
+> 2. … (repeat per item)
+>
+> What do you want to do?
+>
+> 1. **Proceed** — I've already done (or will do) this surgery. Scaffold what `/grid:import` can produce now; mark the remaining work as TODOs in the output.
+> 2. **Bail with `GRID_MIGRATION.md`** — write this plan to `GRID_MIGRATION.md` at the project repo root and stop; I'll do the surgery in a separate pass and re-run `/grid:import` after.
+
+If the user picks **Proceed**: continue to Step 3. Throughout the remaining steps, every place a migration item would have changed the output, add a `// TODO(grid-migration): <surgery>` marker so the gap is visible in the resulting files. The Report in Step 11 lists every TODO.
+
+If the user picks **Bail with `GRID_MIGRATION.md`**: write the migration plan to `GRID_MIGRATION.md` at the project repo root (NOT inside any `.raw_app/` — the user hasn't picked a scope yet). The plan content is the same item list rendered as markdown, plus a "Re-run when ready" footer. Then clean up (`[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`) and exit.
+
+If the user picks **Re-run with a single script** (only offered for the sole-Claude-skill-repo case): prompt for the file path, validate it exists and matches the `.js`/`.ts`/`.mjs`/`.cjs` source-mode-`script` shape, then restart the skill at Step 1 with that path as the new source argument.
+
+### `GRID_MIGRATION.md` shape
+
+````markdown
+# Grid migration plan — <source-identifier>
+
+Generated by `/grid:import` on <date>. Re-run `/grid:import <source>` after the items below are resolved.
+
+## Items
+
+### 1. <signal name>
+
+- **Detected:** <file/dep/pattern>
+- **Current tech:** <current>
+- **Grid tech:** <replacement>
+- **Surgery:**
+  - <bullet>
+  - <bullet>
+- **Automatable:** no — manual.
+
+### 2. <next>
+
+…
+
+## Re-run when ready
+
+```bash
+/grid:import <same source argument>
+```
+````
 
 ### Cleanup obligation
 
-**Before exiting this step on any refusal:** `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`. For source mode `html`, `$CLONE_DIR` is unset so the guard short-circuits — but call it anyway for consistency. The clone (when it happened) is in Step 1, before this refuse check, so a refusal here leaves third-party code in `/tmp` unless you explicitly remove it.
+**Before exiting this step on a hard-stop or bail path:** `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`. For source mode `html` or `script`, `$CLONE_DIR` is unset so the guard short-circuits — but call it anyway for consistency.
 
-## Step 3: Read the target scope from `wmill.yaml`
+**Do not delete `$CLONE_DIR` on the Proceed path.** Steps 3–10 need the clone to detect frameworks, scan for credentials, locate the entry point, transform files, etc. Step 10 owns the final cleanup for the success path.
 
-The scaffold path is determined by this repo's `wmill.yaml`. There's no audience question — `grid-setup` already decided whether this repo deploys to `u/<you>/` or `f/<dept>/`.
+### Source mode `script` — abbreviated flow
+
+When the source is a single `.js`/`.ts`/`.mjs`/`.cjs` file, most of the rest of this skill doesn't apply — no `.raw_app/` directory, no `backend/` runnables, no `wmill.ts` stub, no lint+dev smoke-test. The output is one `<SCOPE>/<name>.script.ts` plus an optional `<SCOPE>/<name>.script.yaml` for metadata. Run these steps and skip the rest:
+
+1. **Bad-fit checks specific to script mode.** Refuse if any of these match:
+
+   - The source contains a React/Vue/Svelte component import (`import React`, `from "react"`, `from "vue"`, `from "svelte"`, `.jsx`/`.tsx` element syntax in the file body). That's a frontend artifact — point the user at source mode `dir` or `html` instead, or `/grid:create` for a fresh raw_app.
+   - The source references Node-only built-ins that don't translate to Bun/Deno cleanly: `child_process.spawn`, `cluster`, `worker_threads`, `dgram`, raw `net.createServer`. Surface the imports to the user and ask whether to proceed (a script that spawns subprocesses won't run on Windmill workers).
+   - File size > 1 MB. That much code as one script is usually a packaged bundle; ask the user to point at the original source files instead.
+
+2. **Pick scope** (same `AskUserQuestion` as Step 3 below — `f/company/` or `f/<dept>/`).
+
+3. **Pick script name** (snake_case, no extension). Default from the source filename. Collide-check `<SCOPE>/<name>.script.ts` and `<SCOPE>/<name>.script.yaml`.
+
+4. **Translate the source:**
+
+   - Wrap the entry point in `export async function main(...): Promise<...> { ... }`. If the source already exports a top-level function, rename it to `main`.
+   - Replace `process.env.X` reads with `await wmill.getVariable("f/<scope>/<name>")` and surface every `X` for the user to provision in the Windmill UI before the first deploy.
+   - Replace any hardcoded URLs/tokens with the same `wmill.getVariable` / `wmill.getResource` pattern.
+   - Imports: keep npm imports as-is (Windmill's Bun runtime resolves them); flag relative imports that point outside the source file's directory (those can't be packaged into a single script).
+   - Strip CLI argument parsing (`process.argv`, `commander`, `yargs`) — Windmill scripts take typed inputs via the `main` signature. Turn each CLI flag into a typed parameter and tell the user.
+
+5. **Lint smoke-test:** `wmill script preview <SCOPE>/<name>.script.ts` (with no inputs, against the local workspace if configured) — confirms the script parses and resolves imports. Skip if the local workspace isn't set up; the CI variable-reference check will catch unresolved `wmill.getVariable` calls.
+
+6. **Report** with the abbreviated shape:
+
+   ```text
+   Imported <source> → <SCOPE>/<name>.script.ts
+
+   Variables flagged:  <list of wmill.getVariable paths the user must create in the UI>
+   Imports flagged:    <relative or Node-only imports the user must rewrite>
+   Local dev:          wmill script run <SCOPE>/<name>.script.ts
+   Push by hand:       wmill script push <SCOPE>/<name>.script.ts --workspace thanx \
+                         --base-url https://grid-origin.thanx.com --token "$TOKEN"
+   Auto-deploy:        merge to master.
+   ```
+
+Then exit this skill — none of the rest of the steps (which are about raw_app shape) apply.
+
+## Step 3: Pick the scope (per app)
+
+Confirm `wmill.yaml` exists (project repo is bootstrapped), then ask the user which scope folder this app should land under. Scope is **per app**, not per repo — the same project repo routinely imports apps into both `f/company/` and `f/<dept>/`.
 
 ```bash
-test -f wmill.yaml || { echo "no wmill.yaml — run /thanx-grid:grid-setup first"; exit 1; }
-SCOPE=$(awk '/^includes:/{flag=1; next} flag && /^[[:space:]]*-/{gsub(/[[:space:]]*-[[:space:]]*/,""); gsub(/\/\*\*$/,""); print; exit}' wmill.yaml)
-echo "scope: $SCOPE"
+test -f wmill.yaml || { echo "no wmill.yaml — run /grid:setup first"; exit 1; }
 ```
 
-If `$SCOPE` is empty or doesn't match `u/<username>` or `f/<dept>`, stop and tell the user to run `/thanx-grid:grid-setup`. **Don't fall back to asking** — silent fallback risks scaffolding under the wrong namespace and triggering deploy-time deletes (see [`claude/rules/sync-push-deletes.md`](../../claude/rules/sync-push-deletes.md)).
+Use `AskUserQuestion`:
 
-For `f/<dept>/` scope, verify `<SCOPE>/folder.meta.yaml` exists. If missing, re-run `/thanx-grid:grid-setup` — the deploy will silently strip group ACLs without it.
+> Where should this imported app live?
+>
+> 1. **`f/company/`** — workspace-wide. Pick when the app is genuinely cross-functional.
+> 2. **`f/<dept>/`** — department-owned (`f/eng/`, `f/cs/`, `f/sales/`, …). Pick when one team clearly owns it.
 
-Throughout the rest of this skill, `<SCOPE>` refers to that path (e.g. `u/dcheng` or `f/engineering`).
+If the user picks `f/<dept>/`, ask which department. Common ones: `engineering`, `product`, `design`, `success`, `operations`, `onboarding`, `support`, `finance`, `exec`, `marketing`, `sales`, `agents`, `scheduled`. Reject `f/shared/` — that folder is admin-only.
+
+Store the chosen path as `<SCOPE>` (e.g. `f/company` or `f/engineering`). For the rest of this skill, `<SCOPE>/<name>.raw_app/` is the destination.
+
+**Folder bootstrap.** If `<SCOPE>/folder.meta.yaml` doesn't exist yet, scaffold it now using the template in `/grid:create` Step 3 (substituting the correct dept name + SCIM group). Without `folder.meta.yaml`, the first push won't have the right ACLs — the deploy still succeeds, but the app is visible to nobody until perms are added by hand. **Special case** — for `f/success/`, the SCIM group is `customer_success` (predates the folder rename).
 
 ## Step 4: Ask the user — app name
 
@@ -174,12 +308,12 @@ If the entry mounts to a selector other than `#root` (`document.getElementById("
 
 A single `.html` file has a different shape — there's nothing to "probe" because there are no sibling files. Instead, identify the four regions that map to the four files we'll write in Step 8:
 
-| HTML region                                                          | Maps to                  | Notes                                                                                                                                                                                                                              |
-| -------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Every `<style>…</style>` block in `<head>`                           | `index.css`              | Concatenate in source order. Strip any `@import url('https://fonts…')` lines — esbuild can warn on remote `@import url(…)` in CSS; inject the `<link>` from `index.tsx` instead (see Step 8 → "Remote font imports").              |
-| `<body>…</body>` minus the closing `<script>` blocks                 | `App.tsx` (JSX)          | Manual conversion — `class=` → `className=`, `for=` → `htmlFor=`, `onclick="fn()"` → `onClick={fn}`, self-closing tags need `/>`, inline `style="color:red"` → `style={{ color: "red" }}`.                                          |
-| `<script src="https://…">` tags in `<head>` or `<body>`              | `package.json` dep, or `index.tsx` `<script>` injection | Try to map each CDN script to its npm equivalent (e.g. `https://cdn.plot.ly/plotly-2.27.0.min.js` → `plotly.js-basic-dist-min`). Prefer npm — bundled, tree-shakeable, typed. Fall back to runtime `<script>` injection in `index.tsx` only when no usable npm package exists. |
-| Inline `<script>…</script>` blocks (no `src`)                        | `App.tsx` + backend script (per Step 7b)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7b → HTML-specific call sites. |
+| HTML region                                             | Maps to                                                 | Notes                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every `<style>…</style>` block in `<head>`              | `index.css`                                             | Concatenate in source order. Strip any `@import url('https://fonts…')` lines — esbuild can warn on remote `@import url(…)` in CSS; inject the `<link>` from `index.tsx` instead (see Step 8 → "Remote font imports").                                                                                                                                                           |
+| `<body>…</body>` minus the closing `<script>` blocks    | `App.tsx` (JSX)                                         | Manual conversion — `class=` → `className=`, `for=` → `htmlFor=`, `onclick="fn()"` → `onClick={fn}`, self-closing tags need `/>`, inline `style="color:red"` → `style={{ color: "red" }}`.                                                                                                                                                                                      |
+| `<script src="https://…">` tags in `<head>` or `<body>` | `package.json` dep, or `index.tsx` `<script>` injection | Try to map each CDN script to its npm equivalent (e.g. `https://cdn.plot.ly/plotly-2.27.0.min.js` → `plotly.js-basic-dist-min`). Prefer npm — bundled, tree-shakeable, typed. Fall back to runtime `<script>` injection in `index.tsx` only when no usable npm package exists.                                                                                                  |
+| Inline `<script>…</script>` blocks (no `src`)           | `App.tsx` + backend script (per Step 7c)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7c → HTML-specific call sites. |
 
 Pick the `#root` mount as you would for any other source. The original HTML likely has no mount selector — the body itself is the canvas. Windmill mounts into `#root`; you'll create that mount in `index.tsx`.
 
@@ -211,7 +345,7 @@ grep -rEn '(password|secret|api[_-]?key|apiKey|auth[_-]?token|bearer|credential|
 
 This catches assignments like `const apiKey = "..."`, `password: "..."`, etc. with a value 16+ chars long. **Threshold rule**: if any string literal of 20+ non-whitespace characters appears in an assignment context (`=`, `:`, function arg) AND the variable/key name contains any of: `token`, `key`, `secret`, `password`, `credential`, `auth`, treat it as suspect. When unsure, treat it as found and stop — false-positive aborts are recoverable; shipping a credential is not.
 
-If anything matches (or eyeball-flags): **STOP**. Tell the user the credential type, file, and line. Per org policy, **the credential must be rotated before anything else** — point them at `#ai-help-desk` and tell them to notify Aaron/Darren. Do not continue the import, even with the file omitted — the upstream repo still has the secret in history. **Before exiting**, run cleanup: `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`. Leaving a clone with hardcoded credentials in `/tmp` is exactly the kind of disk-resident credential the org policy is trying to prevent.
+If anything matches (or eyeball-flags): **STOP**. Tell the user the credential type, file, and line. Per org policy, **the credential must be rotated before anything else** — point them at `#ai-help-desk` and tell them to notify the owners listed in [`CODEOWNERS`](../../.github/CODEOWNERS). Do not continue the import, even with the file omitted — the upstream repo still has the secret in history. **Before exiting**, run cleanup: `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`. Leaving a clone with hardcoded credentials in `/tmp` is exactly the kind of disk-resident credential the org policy is trying to prevent.
 
 ### 7b — Backend call sites and env-var references
 
@@ -249,7 +383,7 @@ Then offer two primary options per call site (a third path follows below via the
 1. **Convert to an inline Windmill runnable** — translate the original handler into a `backend/<runnable>.yaml` with `type: inline` and an `inlineScript` block in the matching language (Bun for TS by default; see `wmill.yaml: defaultTs: bun`). Move any secret-bearing values to `wmill.getVariable("<SCOPE>/<UPPER_SNAKE>")`. Then rewrite the frontend call site to `await wmill.backend.<runnable>(args)`.
 2. **Stub a placeholder runnable** — create `backend/<runnable>.yaml` returning `{ ok: true }` and replace the frontend call with `await wmill.backend.<runnable>(args)` plus a `// TODO: wire up real backend` comment. Use this when the original handler is too complex/external to port in one PR.
 
-A third path the user can pick via "Other": **point at an existing workspace script** — generate `backend/<runnable>.yaml` with `type: script\npath: <SCOPE>/<existing>` (see `AGENTS.md` for the catalogue of deployed scripts).
+A third path the user can pick via "Other": **point at an existing workspace script** — generate `backend/<runnable>.yaml` with `type: script\npath: <SCOPE>/<existing>`. To find existing scripts, run `wmill script list --workspace thanx --base-url https://grid-origin.thanx.com --token "$TOKEN"` or browse `https://grid.thanx.com` for the path you want to reference.
 
 ### 7c — HTML-specific call sites (source mode `html` only)
 
@@ -260,6 +394,7 @@ In addition to the Pass 1 / Pass 2 scans above, single-HTML dashboards have a th
 1. **Find them**: `grep -nE '^(const|let|var) [A-Z_]+ ?= ?[\{\[]' <file>` against the HTML. Any literal larger than ~5 KB is in scope; smaller constants (palettes, enum labels) can stay inline.
 2. **Why move it**: keeping the literal in `App.tsx` inflates the bundle by hundreds of KB, the data isn't queryable from the rest of the workspace, and PR review on a 500 KB `.tsx` file is hostile. Moving to a backend script means the snapshot is a separately-reviewable file, the raw_app fetches it at runtime, and the same data can be referenced by other Windmill jobs or flows.
 3. **Use `AskUserQuestion`** with the same three-option framing as Pass 2, scoped to "where should the snapshot live":
+
    1. **Deployed script with the data inline** (recommended for snapshot data) — generate `<SCOPE>/load_<name>.ts` exporting the data as a `const` plus a `main()` that returns it; `backend/<runnable>.yaml` uses `type: script`. The data file is versioned, diff-able in PRs, and matches the canonical `f/shared/load_cs_metrics.ts` pattern. This is the path the `customer_cube` import took (May 2026).
    2. **Live loader** — if the hardcoded data is actually a stale snapshot of something queryable (Salesforce, Snowflake, Keystone), ask where it lives and write a real loader script. Recommend this if the data has a known live source.
    3. **Inline runnable with the data in `inlineScript.content`** — workable but produces a multi-hundred-KB YAML file. Use only when (1) and (2) aren't options.
@@ -410,21 +545,22 @@ For source mode `html` the "files to drop on the floor" list above doesn't apply
   ```tsx
   const fontLink = document.createElement("link");
   fontLink.rel = "stylesheet";
-  fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+  fontLink.href =
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
   document.head.appendChild(fontLink);
   ```
 - **Tailwind / SCSS directives**: should have been caught by Step 2's bad-fit table. If somehow not, refuse here with the same options (rewrite as plain CSS, pre-process locally, etc.).
 
 **Convert `<body>` markup → `App.tsx` JSX.** The mechanical transforms:
 
-| HTML                        | JSX                                                 |
-| --------------------------- | --------------------------------------------------- |
-| `class="x"`                 | `className="x"`                                     |
-| `for="id"`                  | `htmlFor="id"`                                      |
+| HTML                        | JSX                                                  |
+| --------------------------- | ---------------------------------------------------- |
+| `class="x"`                 | `className="x"`                                      |
+| `for="id"`                  | `htmlFor="id"`                                       |
 | `onclick="fn(arg)"`         | `onClick={() => fn(arg)}` (or refactor to a handler) |
-| `style="color: red"`        | `style={{ color: "red" }}` (object form)            |
-| `<input ...>` / `<img ...>` | `<input ... />` / `<img ... />` (self-closing)      |
-| HTML comments `<!-- … -->`  | `{/* … */}`                                         |
+| `style="color: red"`        | `style={{ color: "red" }}` (object form)             |
+| `<input ...>` / `<img ...>` | `<input ... />` / `<img ... />` (self-closing)       |
+| HTML comments `<!-- … -->`  | `{/* … */}`                                          |
 
 Where the body sets a top-level mount point (the whole body IS the app), wrap the converted JSX in a top-level fragment and let it render under `#root`. Where the body has multiple sibling sections (header, modebar, tabs, footer in the customer_cube case), keep that structure.
 
@@ -433,10 +569,12 @@ Where the body sets a top-level mount point (the whole body IS the app), wrap th
 1. **Top-level data literals** (`const CUBE = {…}` etc.) — these moved to a backend script in Step 7c. Replace each usage with a reference to the loaded snapshot from `wmill.backend.load<Name>(...)`.
 2. **Top-level `let` mutable state** (`let mode = 'general'; let filters = new Set();`) — convert each `let` to a `useState` hook. Any function that writes to it becomes a state setter call.
 3. **DOM-mutating functions** (`function render() { document.getElementById('foo').innerHTML = …; Plotly.newPlot(el, …); }`) — these become React in two patterns:
+
    - Pure-render parts → JSX in the component body (no `useEffect` needed).
    - Imperative third-party APIs (Plotly, D3, Chart.js, video.js) → a child component that takes data via props, holds a `useRef<HTMLDivElement>(null)`, and runs the third-party call inside a `useEffect(() => { lib.init(ref.current, data); return () => lib.destroy(ref.current); }, [data])`. The cleanup is mandatory or you'll leak DOM nodes on re-render.
 
-   **Stabilize the chart `data` / `layout` props or each toggle re-inits the chart.** Object/array literals passed inline at the call site (`<Chart data={[{ x: months, y: totals }]} layout={{ yaxis: {...} }} />`) are new references on every parent render, so the `useEffect([data, layout])` fires every time *any* unrelated state changes. The fix is one of two:
+   **Stabilize the chart `data` / `layout` props or each toggle re-inits the chart.** Object/array literals passed inline at the call site (`<Chart data={[{ x: months, y: totals }]} layout={{ yaxis: {...} }} />`) are new references on every parent render, so the `useEffect([data, layout])` fires every time _any_ unrelated state changes. The fix is one of two:
+
    - **Per-chart child component** that destructures the slice of `snap.charts` it actually depends on and `useMemo`s the data array (e.g. `<RevenueChart charts={snap.charts} />` with `useMemo(() => [...], [charts.rev_months, charts.rev_totals])` inside). This is the customer_cube pattern.
    - **`useMemo` at the call site** keyed on the underlying data references.
 
@@ -503,7 +641,7 @@ For **new workspace script** (`backend/<runnable>.yaml` points at a `type: scrip
 
 - Write the script alongside, at the resolved path (e.g. `f/shared/load_customer_cube.ts`).
 - **Also write a colocated `<script>_test.ts`** with the `// test: script/<windmill_path>` annotation on the first line, per `CLAUDE.md` → "Deploy tests". CI runs every annotated test post-deploy and a missing test means a regression in the loader's return shape only surfaces when the raw_app crashes in production. For HTML-source ports, the test should at minimum assert shape integrity — non-empty primary array, expected top-level keys, numeric fields are numbers — see `f/shared/load_customer_cube_test.ts` for the canonical example.
-- The new script is then deployed in the same `wmill sync push` as the raw_app, so the raw_app can reach it on first load.
+- The new script is deployed in the same commit as the raw_app, so the master-merge per-item push picks up both — see [`claude/rules/per-item-push-not-sync.md`](../../claude/rules/per-item-push-not-sync.md).
 
 At least one runnable must exist — `wmill app lint` fails on an empty `backend/`.
 
@@ -543,7 +681,11 @@ Skipped:      <anything that needed a human call — public/ assets, router stat
 Manual checks:<list of wmill.getVariable / getResource paths the user must confirm in the workspace, per Step 9 item 3>
 
 Local dev:    wmill app dev <SCOPE>/<name>.raw_app
-Deploy:       wmill sync push --yes --workspace thanx
+Push by hand: wmill app push <SCOPE>/<name>.raw_app --workspace thanx \
+                --base-url https://grid-origin.thanx.com --token "$TOKEN"
+Auto-deploy:  merge to master — the reusable deploy workflow per-item-pushes
+              every changed item in the commit range. See
+              claude/rules/per-item-push-not-sync.md.
 Once live:    https://grid.thanx.com/apps/get/<SCOPE>/<name>
 ```
 
@@ -560,14 +702,14 @@ For source mode `html`, also include a `Fidelity:` line listing which sections o
 
 ## Pitfalls
 
-- **`.raw_app` suffix is required.** Without it `wmill sync push` silently skips the directory.
+- **`.raw_app` suffix is required.** Without it the wmill CLI doesn't recognise the directory as an app — see the directory-suffix gotcha in `claude/rules/flow-yaml-shape.md` (same pattern for `.flow/`).
 - **Don't keep `src/`.** Files must be at the `.raw_app/` root. The bundler doesn't descend.
 - **Don't ship `vite.config.ts`, `index.html`, `tsconfig.json`.** They're inert and misleading inside a `.raw_app/`.
 - **Don't copy `.env*` or lock files** under any circumstances. Lock files get regenerated; `.env*` leaks credentials.
 - **`process.env.X` and `import.meta.env.VITE_X` don't work in the bundle.** Move every config value to a runnable that reads `wmill.getVariable(...)`.
 - **Don't call `wmill.<runnable>(...)` directly** — it's `wmill.backend.<runnable>(...)`. The former produces an esbuild warning that CI treats as fatal; see `claude/rules/raw-app-wmill-virtual.md`.
 - **Inline runnable YAML shape:** `type: inline` + `inlineScript: { language, content }`. Putting `content` at the top level lints clean and crashes at runtime. See `claude/rules/raw-app-inline-runnable-yaml.md`.
-- **Hardcoded credentials in the source code.** See Step 7a for the exact grep covering AWS, GitHub, Slack, OpenAI, Anthropic, SendGrid, Datadog, PagerDuty, Sentry, Notion, and private-key blocks. If anything matches: STOP, route the user to `#ai-help-desk` + Aaron/Darren, and require key rotation before continuing. Don't copy the file even with the secret stripped; the upstream repo still has it in history.
+- **Hardcoded credentials in the source code.** See Step 7a for the exact grep covering AWS, GitHub, Slack, OpenAI, Anthropic, SendGrid, Datadog, PagerDuty, Sentry, Notion, and private-key blocks. If anything matches: STOP, route the user to `#ai-help-desk` and the [`CODEOWNERS`](../../.github/CODEOWNERS) owners, and require key rotation before continuing. Don't copy the file even with the secret stripped; the upstream repo still has it in history.
 - **GitHub URL must be `https://github.com/...`.** No `http://`, no `git@github.com:...`, no `github.io`/`gist.github.com`/`raw.githubusercontent.com`. Refused in Step 1 to keep the supply-chain surface narrow per the org install policy.
 - **Monorepos.** Don't try to flatten a monorepo root; ask for a `#<subpath>` suffix pointing at the specific app dir.
 - **`wmill app lint` runs `npm install` from the imported `package.json`.** That pulls arbitrary third-party packages onto the developer's machine. For unfamiliar source repos, eyeball `package.json` before linting — be wary of typo-squatting (`reactt`, `axiox`) and unfamiliar maintainers.

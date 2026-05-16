@@ -1,0 +1,90 @@
+name: Grid CI (reusable)
+
+# Reusable workflow consumed by project repos via:
+#
+#   jobs:
+#     ci:
+#       uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0
+#       secrets:
+#         WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
+#
+# Runs two checks on the caller's repo:
+#   1. `wmill app lint` on every f/**/<name>.raw_app/, treating esbuild
+#      warnings as errors.
+#   2. Verifies every literal wmill.getVariable("f/...") and
+#      wmill.getResource("f/...") path resolves in the prod workspace.
+
+on:
+  workflow_call:
+    inputs:
+      wmill_version:
+        type: string
+        default: "1.700.1"
+        description: windmill-cli version to install.
+      base_url:
+        type: string
+        default: "https://grid-origin.thanx.com"
+        description: Windmill API base URL (direct origin bypasses Cloudflare).
+    secrets:
+      WMILL_READ_TOKEN:
+        required: false
+        description: Token with variables:read + resources:read. Without it, the variable-reference check passes with a warning.
+
+jobs:
+  lint-raw-apps:
+    name: Lint raw apps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Resolve meta-repo ref
+        id: meta
+        # GITHUB_WORKFLOW_REF looks like
+        # "thanx-ai/grid/.github/workflows/ci.yml@refs/tags/v0.1.0"
+        # — we want the ref after the '@'.
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout thanx-ai/grid (for shared scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid
+          ref: ${{ steps.meta.outputs.ref }}
+          path: .grid-meta
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install wmill CLI
+        run: npm install -g windmill-cli@${{ inputs.wmill_version }}
+
+      - name: Lint every .raw_app/ (warnings-as-errors)
+        run: bash .grid-meta/scripts/lint-raw-apps.sh
+
+  check-variable-references:
+    name: Check getVariable / getResource references resolve
+    runs-on: ubuntu-latest
+    # Skip on PRs from forks — no access to the read token.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    env:
+      WMILL_BASE_URL: ${{ inputs.base_url }}
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Resolve meta-repo ref
+        id: meta
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout thanx-ai/grid (for shared scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid
+          ref: ${{ steps.meta.outputs.ref }}
+          path: .grid-meta
+
+      - name: Verify referenced variables / resources exist in prod
+        env:
+          WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
+        run: bash .grid-meta/scripts/check-variable-references.sh
