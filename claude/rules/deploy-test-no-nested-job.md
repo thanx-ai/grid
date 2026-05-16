@@ -4,7 +4,7 @@ Don't use `wmill.runScript(...)` inside a `// test:` deploy test on Grid. The ch
 
 ## Why it bit us
 
-Grid's deploy step in `.github/workflows/deploy.yml` runs `wmill sync push --yes` then `scripts/run-deploy-tests.sh`. The test wrappers looked like:
+Grid's deploy step in `.github/workflows/deploy.yml` runs the per-item push loop (`scripts/deploy-grid-items.sh`) then `scripts/run-deploy-tests.sh`. The test wrappers looked like:
 
 ```ts
 // test: script/f/shared/load_customer_cube
@@ -15,7 +15,7 @@ export async function main() {
 }
 ```
 
-`wmill.runScript` enqueues a *child job* and awaits its result. The parent test job still occupies the `bun` worker while awaiting. The local `docker compose up` stack ships one worker for tag `bun`. The child can't be dispatched because the only matching worker is busy. Deadlock — and the same deadlock is what made every deploy fail on grid.thanx.com:
+`wmill.runScript` enqueues a _child job_ and awaits its result. The parent test job still occupies the `bun` worker while awaiting. The local `docker compose up` stack ships one worker for tag `bun`. The child can't be dispatched because the only matching worker is busy. Deadlock — and the same deadlock is what made every deploy fail on grid.thanx.com:
 
 ```
 ▶ f/shared/load_cs_metrics_test
@@ -47,7 +47,7 @@ In-process call, no nested job, no deadlock — and the test is faster to boot b
 
 ## How to verify
 
-After running `wmill sync push` for a test script, hit `run_wait_result/p/<test_path>` and inspect the queue:
+After pushing a test script (`wmill script push <path>` from your laptop, or via the deploy workflow), hit `run_wait_result/p/<test_path>` and inspect the queue:
 
 ```bash
 curl -sH "Authorization: Bearer $TOKEN" \

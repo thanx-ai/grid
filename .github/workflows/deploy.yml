@@ -1,0 +1,117 @@
+name: Grid Deploy (reusable)
+
+# Reusable workflow consumed by project repos via:
+#
+#   jobs:
+#     deploy:
+#       if: github.ref == 'refs/heads/master'
+#       needs: ci
+#       uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
+#       secrets:
+#         WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
+#
+# Pushes each Grid item changed in this commit range individually with
+# `wmill <type> push`. Never `wmill sync push` — that would let one
+# project repo's deploy delete items owned by another. See
+# claude/rules/per-item-push-not-sync.md for the design rationale and
+# the verified CLI surface.
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        type: string
+        default: "https://grid-origin.thanx.com"
+        description: Windmill API base URL.
+      workspace:
+        type: string
+        default: "thanx"
+        description: Target Windmill workspace name.
+      wmill_version:
+        type: string
+        default: "1.700.1"
+        description: windmill-cli version to install.
+      skip_tests:
+        type: boolean
+        default: false
+        description: Skip the post-push deploy tests. Use sparingly — tests are how we catch regressions.
+    secrets:
+      WINDMILL_DEPLOY_TOKEN:
+        required: true
+        description: Token with write scopes across folders, scripts, flows, apps, raw_apps, resources, variables, schedules, triggers (or unscoped).
+
+# Serialize deploys per caller repo so two PRs merging back-to-back
+# don't race against each other.
+concurrency:
+  group: grid-deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Grid
+    runs-on: ubuntu-latest
+    env:
+      WMILL_BASE_URL: ${{ inputs.base_url }}
+      WMILL_WORKSPACE: ${{ inputs.workspace }}
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+        # fetch-depth: 0 is required so `git diff <before>..<after>` in
+        # scripts/changed-grid-items.sh can resolve both ends.
+        with:
+          fetch-depth: 0
+
+      - name: Resolve meta-repo ref
+        id: meta
+        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout thanx-ai/grid (for shared scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid
+          ref: ${{ steps.meta.outputs.ref }}
+          path: .grid-meta
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install wmill CLI
+        run: npm install -g windmill-cli@${{ inputs.wmill_version }}
+
+      - name: Resolve commit range
+        id: range
+        # On a normal push, github.event.before is the SHA just before
+        # the push and github.sha is the new tip. On workflow_dispatch
+        # or initial pushes we don't have a useful before — fall back
+        # to HEAD~1 so the deploy still does something sensible
+        # (push only the latest commit's items).
+        run: |
+          before="${{ github.event.before || '' }}"
+          after="${{ github.sha }}"
+          zero="0000000000000000000000000000000000000000"
+          if [ -z "$before" ] || [ "$before" = "$zero" ]; then
+            if parent="$(git rev-parse --verify --quiet "${after}^")"; then
+              before="$parent"
+            else
+              # Root commit — nothing earlier to diff against.
+              before="$after"
+            fi
+          fi
+          echo "before=$before" >> "$GITHUB_OUTPUT"
+          echo "after=$after" >> "$GITHUB_OUTPUT"
+          echo "Deploying range: $before..$after"
+
+      - name: Push changed Grid items
+        env:
+          WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
+        run: |
+          bash .grid-meta/scripts/deploy-grid-items.sh \
+            "${{ steps.range.outputs.before }}" \
+            "${{ steps.range.outputs.after }}"
+
+      - name: Run deploy tests
+        if: ${{ !inputs.skip_tests }}
+        env:
+          WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
+        run: bash .grid-meta/scripts/run-deploy-tests.sh

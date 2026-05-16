@@ -1,6 +1,6 @@
 # Developing `thanx-ai/grid`
 
-This doc covers developing the reusable workflows and the `thanx-grid` Claude Code plugin **in this repo**. For working in a team repo against the Grid (the consumer side), see the rules under `claude/rules/` — they're copied into each team repo by the `grid-setup` skill.
+This doc covers developing the reusable workflows and the `grid` Claude Code plugin **in this repo**. For working in a project repo against the Grid (the consumer side), see the rules under `claude/rules/` — they're copied into each project repo by the `setup` skill.
 
 ## Layout reminder
 
@@ -8,11 +8,11 @@ This doc covers developing the reusable workflows and the `thanx-grid` Claude Co
 .claude-plugin/         # plugin manifest + marketplace.json
 .github/workflows/
   ci.yml                # reusable: lint raw apps + check variable refs
-  deploy.yml            # reusable: wmill sync push + deploy tests
+  deploy.yml            # reusable: per-item `wmill <type> push` + deploy tests
   self-test.yml         # this repo's own CI (actionlint + shellcheck)
-claude/rules/           # conventions (canonical; plugin copies to team repos)
+claude/rules/           # conventions (canonical; plugin copies to project repos)
 scripts/                # bash scripts invoked by reusable workflows
-skills/                 # plugin skills (grid-setup, new-app, import-app, promote)
+skills/                 # plugin skills (setup, create, import)
 ```
 
 ## Local development
@@ -59,14 +59,14 @@ Plugin skills are markdown files under `skills/<name>/SKILL.md`. They're read by
    /plugin install thanx-ai/grid@<your-branch>
    ```
 2. Open a fresh test repo (`mkdir /tmp/grid-test && cd /tmp/grid-test && git init`).
-3. Run the skill: `/thanx-grid:grid-setup`.
+3. Run the skill: `/grid:setup`.
 4. Inspect the scaffolded files and the bundled-rules copy.
 
 If the skill produces wrong output, edit `skills/<name>/SKILL.md`, reinstall the plugin (`/plugin install ...` again), and re-test.
 
 ## Adding a new rule
 
-Rules under `claude/rules/` are picked up by Claude at the start of every session in this repo, and copied into team repos by `grid-setup` (Step 6).
+Rules under `claude/rules/` are picked up by Claude at the start of every session in this repo, and copied into project repos by `setup` (Step 6).
 
 To add one:
 
@@ -74,7 +74,7 @@ To add one:
 2. Lead with one sentence summarizing the rule.
 3. Explain _why_ it bit us (what was confusing, what the buggy assumption was).
 4. Explain _how to verify_ (a check, a command, a regex).
-5. Decide whether it applies to team repos. If meta-repo-internal only (e.g. about workflow authoring), add the filename to the skip-list in `skills/grid-setup/SKILL.md` Step 6.
+5. Decide whether it applies to project repos. If meta-repo-internal only (e.g. about workflow authoring), add the filename to the skip-list in `skills/setup/SKILL.md` Step 6.
 
 ## Bumping versions
 
@@ -92,7 +92,7 @@ git tag -f v0
 git push --tags --force-with-lease
 ```
 
-After tagging, update the default `@v0.x.y` reference in `skills/grid-setup/SKILL.md` Step 4 if the bump is minor or major (patches don't change the default).
+After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md` Step 4 if the bump is minor or major (patches don't change the default).
 
 ## Style conventions
 

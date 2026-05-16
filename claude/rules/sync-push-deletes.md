@@ -28,7 +28,7 @@ Three practical consequences:
 
 2. **Adding a new top-level `f/<team>/` folder requires updating `deploy.yml`** — without an `f/<team>/**` entry in `--includes`, items in that folder on the workspace are never deleted by deploy, but new content the repo adds to that folder is also never deployed. Either condition is a foot-gun; keep `deploy.yml` and `ls f/` in lock-step.
 
-3. **`u/<username>/**`is outside both scopes and never touched.** That's why`u/`is the safe namespace for prototyping (and why the`thanx-grid` plugin defaults its scaffolders there for non-`thanx-ai/grid` repos).
+3. **`u/<username>/**`is outside both scopes and never touched.** That's why`u/`is the safe namespace for prototyping (and why the`grid` plugin defaults its scaffolders there for non-`thanx-ai/grid` repos).
 
 ## How to verify before pushing
 

@@ -5,7 +5,7 @@
 ```yaml
 # ✅ Preferred — runnable executes with the caller's permissions, no policy stamp needed
 type: script
-path: f/shared/load_irl_snapshot   # adjust to match your deployed script's path
+path: f/shared/load_irl_snapshot # adjust to match your deployed script's path
 ```
 
 If you have a reason to keep the runnable inline (e.g. a tiny app-specific helper), the source goes inside a nested `inlineScript` block — not at the top level under `code:`:

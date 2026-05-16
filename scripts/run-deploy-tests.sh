@@ -2,10 +2,11 @@
 # Invoke every Windmill test script annotated with `// test:` / `# test:`
 # against the target workspace and fail if any throw.
 #
-# Runs after `wmill sync push` in deploy.yml — by then the test scripts are
-# deployed alongside the runnables they cover, so calling them via
-# run_wait_result exercises the live workspace state. A test that throws
-# returns non-2xx and fails this script (and therefore the deploy workflow).
+# Runs after the per-item `wmill <type> push` loop in deploy.yml — by then
+# the test scripts are deployed alongside the runnables they cover, so
+# calling them via run_wait_result exercises the live workspace state. A
+# test that throws returns non-2xx and fails this script (and therefore
+# the deploy workflow).
 #
 # Convention:
 #   - Test files live next to the runnable they cover, named <name>_test.ts.

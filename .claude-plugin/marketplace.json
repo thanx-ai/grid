@@ -1,0 +1,14 @@
+{
+  "name": "grid",
+  "owner": {
+    "name": "Thanx",
+    "url": "https://github.com/thanx-ai"
+  },
+  "plugins": [
+    {
+      "name": "grid",
+      "source": "./",
+      "description": "Bootstrap and develop individual project repos that deploy to Thanx Grid (https://grid.thanx.com)."
+    }
+  ]
+}

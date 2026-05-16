@@ -1,6 +1,6 @@
 # folder.meta.yaml is the only ACL knob this repo has — items inherit from it
 
-When you deploy a script/app/flow via `wmill sync push` and it's only reachable by `admin@windmill.dev` even though it lives under `f/<team>/`, the cause is almost always `folder.meta.yaml` missing a group grant. Items have no per-item ACL in the repo: `wmill sync` doesn't round-trip per-script/per-app/per-flow `extra_perms`, and `wmill.yaml` has no toggle to opt in. The folder ACL is what governs access, full stop.
+When you deploy a script/app/flow (via the master-merge per-item push, a manual `wmill <type> push`, or local `wmill sync push`) and it's only reachable by `admin@windmill.dev` even though it lives under `f/<scope>/`, the cause is almost always `folder.meta.yaml` missing a group grant. Items have no per-item ACL in the repo: the wmill CLI doesn't round-trip per-script/per-app/per-flow `extra_perms`, and `wmill.yaml` has no toggle to opt in. The folder ACL is what governs access, full stop.
 
 ## Why this bit us
 

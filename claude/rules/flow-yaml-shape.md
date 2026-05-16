@@ -57,15 +57,15 @@ Correct:
 value:
   modules:
     - id: greet
-      value:                                    # ← FlowModuleValue (RawScript / PathScript)
+      value: # ← FlowModuleValue (RawScript / PathScript)
         type: script
         path: f/engineering/example_greeting
-        input_transforms:                       # ← inside value:
+        input_transforms: # ← inside value:
           recipient:
             type: javascript
             expr: flow_input.recipient
-      retry: { constant: { attempts: 2, seconds: 1 } }   # ← FlowModule-level (sibling to value:)
-      cache_ttl: 60                                       # ← FlowModule-level
+      retry: { constant: { attempts: 2, seconds: 1 } } # ← FlowModule-level (sibling to value:)
+      cache_ttl: 60 # ← FlowModule-level
 ```
 
 Wrong (this is what `f/cs/escalation_flow.yaml` does — it predates the convention):
@@ -76,7 +76,7 @@ modules:
     value:
       type: script
       path: f/engineering/example_greeting
-    input_transforms:        # ← WRONG, FlowModule level
+    input_transforms: # ← WRONG, FlowModule level
       recipient:
         type: javascript
         expr: flow_input.recipient

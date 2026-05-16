@@ -1,13 +1,13 @@
 ---
-name: import-app
-description: Import an existing React/Vue/Svelte SPA from a GitHub URL, a local project path, or a single self-contained HTML file into a Windmill raw_app. Reads the target namespace from this repo's `wmill.yaml` (`u/<you>/` or `f/<dept>/`) — run `/thanx-grid:grid-setup` first if there's no `wmill.yaml`. Use when the user says "import app", "bring in an app from <repo>", "convert this project to a raw_app", "encode <github-url> as a Windmill app", or "import this html dashboard".
+name: import
+description: Adopt an EXISTING React/Vue/Svelte SPA (from a GitHub URL, a local project directory, or a single self-contained HTML file) into a Windmill raw_app in this project repo. Transforms the source — strips inert files, rewires API calls to `wmill.runScript`, extracts inline data blobs into backend scripts — rather than copying it verbatim. **Sibling skill to `/grid:create`**, which scaffolds an empty placeholder app. Run `/grid:setup` first if there's no `wmill.yaml`. Use when the user says "import app", "bring in an app from <repo>", "convert this project to a raw_app", "encode <github-url> as a Windmill app", or "import this html dashboard".
 ---
 
-# import-app
+# import
 
 Adopt an existing single-page-app into the canonical Windmill raw_app layout.
 
-**Path convention used throughout this skill.** Examples below write `<SCOPE>/<name>.raw_app/` — `<SCOPE>` is resolved from this repo's `wmill.yaml` `includes:` glob (`u/<your-username>` or `f/<dept>`). Step 3 reads and validates it; every other step uses the substitution unchanged.
+**Path convention used throughout this skill.** Examples below write `<SCOPE>/<name>.raw_app/` — `<SCOPE>` is the per-app scope folder picked in Step 3 (`f/company/` or `f/<dept>/`). Every other step uses the `<SCOPE>` substitution unchanged.
 
 Three accepted source types:
 
@@ -15,7 +15,7 @@ Three accepted source types:
 2. **Local project directory** — absolute or `~`-relative path containing `package.json`.
 3. **Single self-contained HTML file** — a `.html` file (or `file:///…` URL) with inline `<style>` and `<script>` blocks and **no relative `<script src=...>` siblings**. The skill extracts the styles into `index.css`, the body into `App.tsx`, and any large hardcoded data blob in the script (e.g. `const CUBE = {…}`) into a backend Windmill script. Use this when someone shares a stand-alone HTML dashboard, prototype, or report and asks for it to land in the workspace. See Step 1 → "Source mode HTML" for shape requirements and Step 8 → "HTML source transforms" for the conversion rules.
 
-Companion to `/new-app`. `new-app` scaffolds an empty placeholder; `import-app` adapts existing code. All three source types produce the same on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the root, `backend/` for runnables) — see the **Apps** section of `CLAUDE.md` for the canonical layout and `claude/rules/raw-app-wmill-virtual.md` / `claude/rules/raw-app-inline-runnable-yaml.md` / `claude/rules/raw-app-from-html.md` for the gotchas that have already bitten us.
+Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. All three source types produce the same on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the root, `backend/` for runnables) — see the **Apps** section of `CLAUDE.md` for the canonical layout and `claude/rules/raw-app-wmill-virtual.md` / `claude/rules/raw-app-inline-runnable-yaml.md` / `claude/rules/raw-app-from-html.md` for the gotchas that have already bitten us.
 
 ## When NOT to use
 
@@ -31,15 +31,18 @@ Companion to `/new-app`. `new-app` scaffolds an empty placeholder; `import-app` 
 The skill accepts an optional argument in one of these forms:
 
 **GitHub URL** (source mode `github`):
+
 - `https://github.com/owner/repo` — clones via `git clone --depth 1`.
 - `https://github.com/owner/repo#branch` — clones that branch.
 - `https://github.com/owner/repo#path/to/subdir` — clones the repo, then operates on the subdir (use this for monorepos — point at the specific app dir).
 - `https://github.com/owner/repo#branch:path/to/subdir` — both.
 
 **Local project directory** (source mode `dir`):
+
 - An absolute or `~`-relative path to a directory — used directly, no clone.
 
 **Single HTML file** (source mode `html`):
+
 - `file:///absolute/path/to/file.html` — strip the `file://` prefix, validate the local path.
 - A plain absolute or `~`-relative path ending in `.html` or `.htm`.
 - Used directly, no clone. The file is treated as the entire source — no sibling files are read.
@@ -64,7 +67,7 @@ If the fragment `#…` contains a `:` (e.g. `#main:apps/web`), split on the firs
 
 After resolving, verify the final operating directory is still inside `$CLONE_DIR`: `case "$(cd "$CLONE_DIR/$subpath" 2>/dev/null && pwd -P)" in "$(cd "$CLONE_DIR" && pwd -P)"/*|"$(cd "$CLONE_DIR" && pwd -P)") ;; *) echo "subpath escapes clone dir" >&2; exit 1 ;; esac`. If this fails, refuse and run Step 10 cleanup.
 
-For GitHub URLs, capture `CLONE_DIR=$(mktemp -d -t import-app.XXXXXX)` and run `git clone --depth 1 [--branch "<branch>"] -- "<url-without-fragment>" "$CLONE_DIR"`. **Quote both the branch and the URL**, and use `--` to end git's option parsing — together these defang branch names starting with `-` (which would otherwise be interpreted as git flags) and shell-special characters in either field. Before running, validate the branch matches `^[A-Za-z0-9._/-]+$` and reject anything else. Treat `$CLONE_DIR` (plus any subpath) the same as a local path from here on. If the clone is private and auth-required, the `git clone` call will fail — tell the user to either clone locally and re-run the skill with the local path, or set up GitHub credentials via the `gh` CLI (`gh auth login`) before retrying.
+For GitHub URLs, capture `CLONE_DIR=$(mktemp -d -t grid-import.XXXXXX)` and run `git clone --depth 1 [--branch "<branch>"] -- "<url-without-fragment>" "$CLONE_DIR"`. **Quote both the branch and the URL**, and use `--` to end git's option parsing — together these defang branch names starting with `-` (which would otherwise be interpreted as git flags) and shell-special characters in either field. Before running, validate the branch matches `^[A-Za-z0-9._/-]+$` and reject anything else. Treat `$CLONE_DIR` (plus any subpath) the same as a local path from here on. If the clone is private and auth-required, the `git clone` call will fail — tell the user to either clone locally and re-run the skill with the local path, or set up GitHub credentials via the `gh` CLI (`gh auth login`) before retrying.
 
 For source mode `html`, there is no clone — `$CLONE_DIR` stays unset, and Step 10 cleanup only has the (failure-only) destination removal to do. All later steps read directly from the absolute path resolved here; treat it as the entire source tree.
 
@@ -95,13 +98,13 @@ When refusing, name the file/dep that triggered it (e.g. "found `next@14.2.3` in
 
 Run these on the imported `.html` file before continuing. Refuse on the first match:
 
-| Signal | How to check | Why we refuse |
-| --- | --- | --- |
-| Relative or root-absolute `<script src=…>`, `<link href=…>`, `<img src=…>` | `grep -E '(src\|href)=["'"'"'](\\./\|/)' <file>` (excludes CDN `https://…`) | The file isn't self-contained — it's the entry point of a multi-file static site. Either zip the whole directory and re-run as source mode `dir`, or have the user pre-bundle to a true single-file build first. |
-| SSR/hydration markers | `grep -E '__NEXT_DATA__\|__SAPPER__\|__NUXT__\|<!--\\$-->\|<!--/\\$-->\|data-react-stream-root\|data-svelte-h=' <file>` | This is rendered output from an SSR framework, not an authored SPA. The original Next.js / SvelteKit / Nuxt project is the right import target; refuse and tell the user to point at that. |
-| Heavy framework signals embedded inline | `grep -E 'window.__VUE__\|window.__NUXT__\|window.__INITIAL_STATE__\|<div id="__next">' <file>` | Same as above — pre-rendered framework output, not authorable. |
-| Inline `<script type="importmap">` | `grep -E 'type="importmap"' <file>` | Import maps drive runtime ES module resolution from a manifest. esbuild has no concept of them; the bundle will fail to find the imports at build time. Refuse and tell the user to commit to a normal bundler-driven project first. |
-| File size > 5 MB | `[ $(wc -c < <file>) -gt 5242880 ]` | Likely contains embedded binaries (images base64'd into `src="data:…"`, fonts, etc.) that won't transform cleanly. Refuse and ask the user to externalize the binaries first, or point at the upstream project. |
+| Signal                                                                     | How to check                                                                                                            | Why we refuse                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Relative or root-absolute `<script src=…>`, `<link href=…>`, `<img src=…>` | `grep -E '(src\|href)=["'"'"'](\\./\|/)' <file>` (excludes CDN `https://…`)                                             | The file isn't self-contained — it's the entry point of a multi-file static site. Either zip the whole directory and re-run as source mode `dir`, or have the user pre-bundle to a true single-file build first.                     |
+| SSR/hydration markers                                                      | `grep -E '__NEXT_DATA__\|__SAPPER__\|__NUXT__\|<!--\\$-->\|<!--/\\$-->\|data-react-stream-root\|data-svelte-h=' <file>` | This is rendered output from an SSR framework, not an authored SPA. The original Next.js / SvelteKit / Nuxt project is the right import target; refuse and tell the user to point at that.                                           |
+| Heavy framework signals embedded inline                                    | `grep -E 'window.__VUE__\|window.__NUXT__\|window.__INITIAL_STATE__\|<div id="__next">' <file>`                         | Same as above — pre-rendered framework output, not authorable.                                                                                                                                                                       |
+| Inline `<script type="importmap">`                                         | `grep -E 'type="importmap"' <file>`                                                                                     | Import maps drive runtime ES module resolution from a manifest. esbuild has no concept of them; the bundle will fail to find the imports at build time. Refuse and tell the user to commit to a normal bundler-driven project first. |
+| File size > 5 MB                                                           | `[ $(wc -c < <file>) -gt 5242880 ]`                                                                                     | Likely contains embedded binaries (images base64'd into `src="data:…"`, fonts, etc.) that won't transform cleanly. Refuse and ask the user to externalize the binaries first, or point at the upstream project.                      |
 
 If the HTML uses `<script type="module">` with **inline** content (no `src`), that's fine — port to `index.tsx` / `useEffect` blocks in Step 8.
 
@@ -109,21 +112,26 @@ If the HTML uses `<script type="module">` with **inline** content (no `src`), th
 
 **Before exiting this step on any refusal:** `[ -n "$CLONE_DIR" ] && rm -rf "$CLONE_DIR"`. For source mode `html`, `$CLONE_DIR` is unset so the guard short-circuits — but call it anyway for consistency. The clone (when it happened) is in Step 1, before this refuse check, so a refusal here leaves third-party code in `/tmp` unless you explicitly remove it.
 
-## Step 3: Read the target scope from `wmill.yaml`
+## Step 3: Pick the scope (per app)
 
-The scaffold path is determined by this repo's `wmill.yaml`. There's no audience question — `grid-setup` already decided whether this repo deploys to `u/<you>/` or `f/<dept>/`.
+Confirm `wmill.yaml` exists (project repo is bootstrapped), then ask the user which scope folder this app should land under. Scope is **per app**, not per repo — the same project repo routinely imports apps into both `f/company/` and `f/<dept>/`.
 
 ```bash
-test -f wmill.yaml || { echo "no wmill.yaml — run /thanx-grid:grid-setup first"; exit 1; }
-SCOPE=$(awk '/^includes:/{flag=1; next} flag && /^[[:space:]]*-/{gsub(/[[:space:]]*-[[:space:]]*/,""); gsub(/\/\*\*$/,""); print; exit}' wmill.yaml)
-echo "scope: $SCOPE"
+test -f wmill.yaml || { echo "no wmill.yaml — run /grid:setup first"; exit 1; }
 ```
 
-If `$SCOPE` is empty or doesn't match `u/<username>` or `f/<dept>`, stop and tell the user to run `/thanx-grid:grid-setup`. **Don't fall back to asking** — silent fallback risks scaffolding under the wrong namespace and triggering deploy-time deletes (see [`claude/rules/sync-push-deletes.md`](../../claude/rules/sync-push-deletes.md)).
+Use `AskUserQuestion`:
 
-For `f/<dept>/` scope, verify `<SCOPE>/folder.meta.yaml` exists. If missing, re-run `/thanx-grid:grid-setup` — the deploy will silently strip group ACLs without it.
+> Where should this imported app live?
+>
+> 1. **`f/company/`** — workspace-wide. Pick when the app is genuinely cross-functional.
+> 2. **`f/<dept>/`** — department-owned (`f/eng/`, `f/cs/`, `f/sales/`, …). Pick when one team clearly owns it.
 
-Throughout the rest of this skill, `<SCOPE>` refers to that path (e.g. `u/dcheng` or `f/engineering`).
+If the user picks `f/<dept>/`, ask which department. Common ones: `engineering`, `product`, `design`, `success`, `operations`, `onboarding`, `support`, `finance`, `exec`, `marketing`, `sales`, `agents`, `scheduled`. Reject `f/shared/` — that folder is admin-only.
+
+Store the chosen path as `<SCOPE>` (e.g. `f/company` or `f/engineering`). For the rest of this skill, `<SCOPE>/<name>.raw_app/` is the destination.
+
+**Folder bootstrap.** If `<SCOPE>/folder.meta.yaml` doesn't exist yet, scaffold it now using the template in `/grid:create` Step 3 (substituting the correct dept name + SCIM group). Without `folder.meta.yaml`, the first push won't have the right ACLs — the deploy still succeeds, but the app is visible to nobody until perms are added by hand. **Special case** — for `f/success/`, the SCIM group is `customer_success` (predates the folder rename).
 
 ## Step 4: Ask the user — app name
 
@@ -174,12 +182,12 @@ If the entry mounts to a selector other than `#root` (`document.getElementById("
 
 A single `.html` file has a different shape — there's nothing to "probe" because there are no sibling files. Instead, identify the four regions that map to the four files we'll write in Step 8:
 
-| HTML region                                                          | Maps to                  | Notes                                                                                                                                                                                                                              |
-| -------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Every `<style>…</style>` block in `<head>`                           | `index.css`              | Concatenate in source order. Strip any `@import url('https://fonts…')` lines — esbuild can warn on remote `@import url(…)` in CSS; inject the `<link>` from `index.tsx` instead (see Step 8 → "Remote font imports").              |
-| `<body>…</body>` minus the closing `<script>` blocks                 | `App.tsx` (JSX)          | Manual conversion — `class=` → `className=`, `for=` → `htmlFor=`, `onclick="fn()"` → `onClick={fn}`, self-closing tags need `/>`, inline `style="color:red"` → `style={{ color: "red" }}`.                                          |
-| `<script src="https://…">` tags in `<head>` or `<body>`              | `package.json` dep, or `index.tsx` `<script>` injection | Try to map each CDN script to its npm equivalent (e.g. `https://cdn.plot.ly/plotly-2.27.0.min.js` → `plotly.js-basic-dist-min`). Prefer npm — bundled, tree-shakeable, typed. Fall back to runtime `<script>` injection in `index.tsx` only when no usable npm package exists. |
-| Inline `<script>…</script>` blocks (no `src`)                        | `App.tsx` + backend script (per Step 7b)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7b → HTML-specific call sites. |
+| HTML region                                             | Maps to                                                 | Notes                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every `<style>…</style>` block in `<head>`              | `index.css`                                             | Concatenate in source order. Strip any `@import url('https://fonts…')` lines — esbuild can warn on remote `@import url(…)` in CSS; inject the `<link>` from `index.tsx` instead (see Step 8 → "Remote font imports").                                                                                                                                                           |
+| `<body>…</body>` minus the closing `<script>` blocks    | `App.tsx` (JSX)                                         | Manual conversion — `class=` → `className=`, `for=` → `htmlFor=`, `onclick="fn()"` → `onClick={fn}`, self-closing tags need `/>`, inline `style="color:red"` → `style={{ color: "red" }}`.                                                                                                                                                                                      |
+| `<script src="https://…">` tags in `<head>` or `<body>` | `package.json` dep, or `index.tsx` `<script>` injection | Try to map each CDN script to its npm equivalent (e.g. `https://cdn.plot.ly/plotly-2.27.0.min.js` → `plotly.js-basic-dist-min`). Prefer npm — bundled, tree-shakeable, typed. Fall back to runtime `<script>` injection in `index.tsx` only when no usable npm package exists.                                                                                                  |
+| Inline `<script>…</script>` blocks (no `src`)           | `App.tsx` + backend script (per Step 7b)                | The vanilla JS mutates the DOM imperatively (`document.getElementById(...).innerHTML = …`, `Plotly.newPlot(el, …)`). Most of that becomes `useEffect(() => { …Plotly… }, [data])` with a `useRef<HTMLDivElement>(null)`. Large hardcoded data literals (`const CUBE = {…}`, `const DATA = […]`) are **mandatory backend extractions** — see Step 7b → HTML-specific call sites. |
 
 Pick the `#root` mount as you would for any other source. The original HTML likely has no mount selector — the body itself is the canvas. Windmill mounts into `#root`; you'll create that mount in `index.tsx`.
 
@@ -260,6 +268,7 @@ In addition to the Pass 1 / Pass 2 scans above, single-HTML dashboards have a th
 1. **Find them**: `grep -nE '^(const|let|var) [A-Z_]+ ?= ?[\{\[]' <file>` against the HTML. Any literal larger than ~5 KB is in scope; smaller constants (palettes, enum labels) can stay inline.
 2. **Why move it**: keeping the literal in `App.tsx` inflates the bundle by hundreds of KB, the data isn't queryable from the rest of the workspace, and PR review on a 500 KB `.tsx` file is hostile. Moving to a backend script means the snapshot is a separately-reviewable file, the raw_app fetches it at runtime, and the same data can be referenced by other Windmill jobs or flows.
 3. **Use `AskUserQuestion`** with the same three-option framing as Pass 2, scoped to "where should the snapshot live":
+
    1. **Deployed script with the data inline** (recommended for snapshot data) — generate `<SCOPE>/load_<name>.ts` exporting the data as a `const` plus a `main()` that returns it; `backend/<runnable>.yaml` uses `type: script`. The data file is versioned, diff-able in PRs, and matches the canonical `f/shared/load_cs_metrics.ts` pattern. This is the path the `customer_cube` import took (May 2026).
    2. **Live loader** — if the hardcoded data is actually a stale snapshot of something queryable (Salesforce, Snowflake, Keystone), ask where it lives and write a real loader script. Recommend this if the data has a known live source.
    3. **Inline runnable with the data in `inlineScript.content`** — workable but produces a multi-hundred-KB YAML file. Use only when (1) and (2) aren't options.
@@ -410,21 +419,22 @@ For source mode `html` the "files to drop on the floor" list above doesn't apply
   ```tsx
   const fontLink = document.createElement("link");
   fontLink.rel = "stylesheet";
-  fontLink.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+  fontLink.href =
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
   document.head.appendChild(fontLink);
   ```
 - **Tailwind / SCSS directives**: should have been caught by Step 2's bad-fit table. If somehow not, refuse here with the same options (rewrite as plain CSS, pre-process locally, etc.).
 
 **Convert `<body>` markup → `App.tsx` JSX.** The mechanical transforms:
 
-| HTML                        | JSX                                                 |
-| --------------------------- | --------------------------------------------------- |
-| `class="x"`                 | `className="x"`                                     |
-| `for="id"`                  | `htmlFor="id"`                                      |
+| HTML                        | JSX                                                  |
+| --------------------------- | ---------------------------------------------------- |
+| `class="x"`                 | `className="x"`                                      |
+| `for="id"`                  | `htmlFor="id"`                                       |
 | `onclick="fn(arg)"`         | `onClick={() => fn(arg)}` (or refactor to a handler) |
-| `style="color: red"`        | `style={{ color: "red" }}` (object form)            |
-| `<input ...>` / `<img ...>` | `<input ... />` / `<img ... />` (self-closing)      |
-| HTML comments `<!-- … -->`  | `{/* … */}`                                         |
+| `style="color: red"`        | `style={{ color: "red" }}` (object form)             |
+| `<input ...>` / `<img ...>` | `<input ... />` / `<img ... />` (self-closing)       |
+| HTML comments `<!-- … -->`  | `{/* … */}`                                          |
 
 Where the body sets a top-level mount point (the whole body IS the app), wrap the converted JSX in a top-level fragment and let it render under `#root`. Where the body has multiple sibling sections (header, modebar, tabs, footer in the customer_cube case), keep that structure.
 
@@ -433,10 +443,12 @@ Where the body sets a top-level mount point (the whole body IS the app), wrap th
 1. **Top-level data literals** (`const CUBE = {…}` etc.) — these moved to a backend script in Step 7c. Replace each usage with a reference to the loaded snapshot from `wmill.backend.load<Name>(...)`.
 2. **Top-level `let` mutable state** (`let mode = 'general'; let filters = new Set();`) — convert each `let` to a `useState` hook. Any function that writes to it becomes a state setter call.
 3. **DOM-mutating functions** (`function render() { document.getElementById('foo').innerHTML = …; Plotly.newPlot(el, …); }`) — these become React in two patterns:
+
    - Pure-render parts → JSX in the component body (no `useEffect` needed).
    - Imperative third-party APIs (Plotly, D3, Chart.js, video.js) → a child component that takes data via props, holds a `useRef<HTMLDivElement>(null)`, and runs the third-party call inside a `useEffect(() => { lib.init(ref.current, data); return () => lib.destroy(ref.current); }, [data])`. The cleanup is mandatory or you'll leak DOM nodes on re-render.
 
-   **Stabilize the chart `data` / `layout` props or each toggle re-inits the chart.** Object/array literals passed inline at the call site (`<Chart data={[{ x: months, y: totals }]} layout={{ yaxis: {...} }} />`) are new references on every parent render, so the `useEffect([data, layout])` fires every time *any* unrelated state changes. The fix is one of two:
+   **Stabilize the chart `data` / `layout` props or each toggle re-inits the chart.** Object/array literals passed inline at the call site (`<Chart data={[{ x: months, y: totals }]} layout={{ yaxis: {...} }} />`) are new references on every parent render, so the `useEffect([data, layout])` fires every time _any_ unrelated state changes. The fix is one of two:
+
    - **Per-chart child component** that destructures the slice of `snap.charts` it actually depends on and `useMemo`s the data array (e.g. `<RevenueChart charts={snap.charts} />` with `useMemo(() => [...], [charts.rev_months, charts.rev_totals])` inside). This is the customer_cube pattern.
    - **`useMemo` at the call site** keyed on the underlying data references.
 
@@ -503,7 +515,7 @@ For **new workspace script** (`backend/<runnable>.yaml` points at a `type: scrip
 
 - Write the script alongside, at the resolved path (e.g. `f/shared/load_customer_cube.ts`).
 - **Also write a colocated `<script>_test.ts`** with the `// test: script/<windmill_path>` annotation on the first line, per `CLAUDE.md` → "Deploy tests". CI runs every annotated test post-deploy and a missing test means a regression in the loader's return shape only surfaces when the raw_app crashes in production. For HTML-source ports, the test should at minimum assert shape integrity — non-empty primary array, expected top-level keys, numeric fields are numbers — see `f/shared/load_customer_cube_test.ts` for the canonical example.
-- The new script is then deployed in the same `wmill sync push` as the raw_app, so the raw_app can reach it on first load.
+- The new script is deployed in the same commit as the raw_app, so the master-merge per-item push picks up both — see [`claude/rules/per-item-push-not-sync.md`](../../claude/rules/per-item-push-not-sync.md).
 
 At least one runnable must exist — `wmill app lint` fails on an empty `backend/`.
 
@@ -543,7 +555,11 @@ Skipped:      <anything that needed a human call — public/ assets, router stat
 Manual checks:<list of wmill.getVariable / getResource paths the user must confirm in the workspace, per Step 9 item 3>
 
 Local dev:    wmill app dev <SCOPE>/<name>.raw_app
-Deploy:       wmill sync push --yes --workspace thanx
+Push by hand: wmill app push <SCOPE>/<name>.raw_app --workspace thanx \
+                --base-url https://grid-origin.thanx.com --token "$TOKEN"
+Auto-deploy:  merge to master — the reusable deploy workflow per-item-pushes
+              every changed item in the commit range. See
+              claude/rules/per-item-push-not-sync.md.
 Once live:    https://grid.thanx.com/apps/get/<SCOPE>/<name>
 ```
 
@@ -560,7 +576,7 @@ For source mode `html`, also include a `Fidelity:` line listing which sections o
 
 ## Pitfalls
 
-- **`.raw_app` suffix is required.** Without it `wmill sync push` silently skips the directory.
+- **`.raw_app` suffix is required.** Without it the wmill CLI doesn't recognise the directory as an app — see the directory-suffix gotcha in `claude/rules/flow-yaml-shape.md` (same pattern for `.flow/`).
 - **Don't keep `src/`.** Files must be at the `.raw_app/` root. The bundler doesn't descend.
 - **Don't ship `vite.config.ts`, `index.html`, `tsconfig.json`.** They're inert and misleading inside a `.raw_app/`.
 - **Don't copy `.env*` or lock files** under any circumstances. Lock files get regenerated; `.env*` leaks credentials.

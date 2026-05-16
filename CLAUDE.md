@@ -15,7 +15,7 @@ At the start of every session, read every file under `claude/rules/`. Those capt
 `thanx-ai/grid` is a **meta-repo**, not a content repo. It ships two things:
 
 1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
-2. **`thanx-grid` — a Claude Code plugin** (under `.claude-plugin/` and `skills/`) that bootstraps individual project repos: scaffolds `wmill.yaml`, the repo's thin `.github/workflows/grid.yml`, and copies the conventions in `claude/rules/` into the project repo so future Claude sessions there pick them up.
+2. **`grid` — a Claude Code plugin** (under `.claude-plugin/` and `skills/`) that bootstraps individual project repos: scaffolds `wmill.yaml`, the repo's thin `.github/workflows/grid.yml`, and copies the conventions in `claude/rules/` into the project repo so future Claude sessions there pick them up.
 
 **There is no `f/` content in this repo.** Grid code lives in each person's own project repo (e.g. `thanx-ai/grid-examples`, which is the canonical reference). If you're tempted to add an `f/<scope>/...` file here, you're solving the wrong problem — it belongs in a project repo.
 
@@ -32,13 +32,13 @@ Grid code is owned per-person, not per-team. Each person has their own GitHub pr
 
 Both are workspace-readable; the distinction is ownership and write access (dept-group write via SCIM for `f/<dept>/`, broader for `f/company/`). The `u/<you>/` namespace exists in Windmill but the plugin's scaffolders don't target it — prototypes live as drafts in the same project repo, not as a separate maturity tier.
 
-The plugin's `/thanx-grid:new-app` (and sibling scaffolders) asks scope per item. A single project repo routinely ships to both `f/company/` and `f/<dept>/`. The legacy `/thanx-grid:promote` skill (designed for `u/<you>/` → `f/<dept>/`) needs to either be repurposed for `f/<dept>/` → `f/company/` rename or removed — open question.
+The plugin's `/grid:create` (and sibling scaffolders) asks scope per item. A single project repo routinely ships to both `f/company/` and `f/<dept>/`.
 
 ### Reusable workflows
 
 Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid` at the same ref into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **If you change `scripts/*.sh`, the change ships at the ref the caller pinned — `v0.1.0` callers get `v0.1.0` scripts, not whatever's on master.**
 
-The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into team repos via the plugin's `grid-setup` skill (Step 6).
+The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 6).
 
 ### Versioning
 
@@ -67,16 +67,17 @@ While the plugin and workflows are unstable (pre-`v1`), bumps happen liberally. 
   deploy.yml            # reusable: per-item `wmill <type> push` + deploy tests
   self-test.yml         # this repo's own CI (actionlint + shellcheck)
 claude/rules/           # conventions Claude reads at session start
-                        # (canonical source; plugin copies to team repos)
+                        # (canonical source; plugin copies to project repos)
 scripts/                # bash scripts invoked by reusable workflows
   lint-raw-apps.sh
   check-variable-references.sh
+  changed-grid-items.sh   # classifies changed paths into wmill push args
+  deploy-grid-items.sh    # loops `wmill <type> push` over the changed set
   run-deploy-tests.sh
-skills/                 # plugin skills
-  grid-setup/           # bootstrap a team repo
-  new-app/              # scaffold a raw_app at the team repo's scope
-  import-app/           # adopt an existing project as a raw_app
-  promote/              # u/<you>/ → f/<dept>/ flip
+skills/                 # plugin skills (/grid:setup, /grid:create, /grid:import)
+  setup/                # one-time repo bootstrap (wmill.yaml, workflow caller, token, rules)
+  create/               # scaffold a NEW raw_app, picking scope per app
+  import/               # adopt an EXISTING project / HTML file as a raw_app
 ```
 
 ## Common commands
@@ -109,8 +110,8 @@ When making changes, route by purpose:
 | New optional workflow input               | `.github/workflows/<name>.yml` — minor bump            |
 | Breaking workflow change                  | `.github/workflows/<name>.yml` — major bump + announce |
 | New plugin skill                          | `skills/<name>/SKILL.md` + update `.claude-plugin/`    |
-| Convention every project repo should know | `claude/rules/<topic>.md` — picked up by `grid-setup`  |
-| Internal rule (meta-repo authoring only)  | `claude/rules/<topic>.md` + skip-list in `grid-setup`  |
+| Convention every project repo should know | `claude/rules/<topic>.md` — picked up by `setup`       |
+| Internal rule (meta-repo authoring only)  | `claude/rules/<topic>.md` + skip-list in `setup`       |
 
 ## Self-test CI
 
@@ -131,7 +132,7 @@ If you hit a non-obvious gotcha while working here — a misleading doc, a CLI f
 - Short, self-contained rule → new file under `claude/rules/<topic>.md` (one sentence lede, then _why_ it bit us and _how to verify_).
 - Contradicts something here or in `README.md` → fix that text inline too.
 
-Rules that apply to team repos (e.g. raw-app authoring gotchas) ride along into every team repo via the `grid-setup` skill. Rules that are meta-repo-internal (e.g. `reusable-workflow-meta-checkout.md`) stay here only — the skill's skip-list excludes them.
+Rules that apply to project repos (e.g. raw-app authoring gotchas) ride along into every project repo via the `setup` skill. Rules that are meta-repo-internal (e.g. `reusable-workflow-meta-checkout.md`) stay here only — the skill's skip-list excludes them.
 
 ## Before requesting review
 

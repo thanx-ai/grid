@@ -1,0 +1,9 @@
+{
+  "name": "grid",
+  "description": "Bootstrap and develop individual project repos that deploy to Thanx Grid. Provides /grid:setup (one-time repo bootstrap), /grid:create (scaffold a new raw_app), and /grid:import (adopt an existing project as a raw_app). Each item picks its own scope folder (f/company/ or f/<dept>/) at scaffold time.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Thanx"
+  },
+  "repository": "https://github.com/thanx-ai/grid"
+}
