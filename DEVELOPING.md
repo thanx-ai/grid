@@ -54,15 +54,18 @@ After CI passes, **don't merge the grid-examples test PR** — close it and reve
 
 Plugin skills are markdown files under `skills/<name>/SKILL.md`. They're read by Claude Code at invocation time; no compilation step. To test locally:
 
-1. Install the plugin from a local path (if your Claude Code supports it) or push to a branch and install from GitHub:
+1. Push your feature branch to `thanx-ai/grid`, then register the marketplace pointing at that branch:
    ```text
-   /plugin install thanx-ai/grid@<your-branch>
+   /plugin marketplace add thanx-ai/grid#<your-branch>
+   /plugin install grid@thanx-ai-grid
+   /reload-plugins
    ```
+   (If the marketplace was already registered against a different ref, run `/plugin marketplace update thanx-ai-grid` to refresh after pushing.)
 2. Open a fresh test repo (`mkdir /tmp/grid-test && cd /tmp/grid-test && git init`).
 3. Run the skill: `/grid:setup`.
 4. Inspect the scaffolded files and the bundled-rules copy.
 
-If the skill produces wrong output, edit `skills/<name>/SKILL.md`, reinstall the plugin (`/plugin install ...` again), and re-test.
+If the skill produces wrong output, edit `skills/<name>/SKILL.md`, push to your branch, run `/plugin marketplace update thanx-ai-grid` to refresh, and re-test.
 
 ## Adding a new rule
 

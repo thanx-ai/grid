@@ -31,18 +31,30 @@ A repo or source that doesn't fit Grid as-is is **not refused** — it gets a mi
 
 ### Installing the plugin
 
+Claude Code uses a two-step marketplace + plugin model. Register this repo as a marketplace, then install the `grid` plugin from it:
+
 ```text
 # In any Claude Code session:
-/plugin install thanx-ai/grid
+/plugin marketplace add thanx-ai/grid
+/plugin install grid@thanx-ai-grid
+/reload-plugins
 ```
 
-That fetches the latest tagged release and installs it. Subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
+The marketplace name is auto-derived from the repo slug (`thanx-ai/grid` → `thanx-ai-grid`). After install + reload, subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
 
-To pin a specific version, install from a tag: `/plugin install thanx-ai/grid@v0.1.0`. To install from a feature branch you're testing: `/plugin install thanx-ai/grid@<branch>`.
+**To pin a specific version** at marketplace-add time, append `#<ref>` to the slug:
 
-If the install command isn't recognised, your Claude Code is older than the plugin system release — upgrade Claude Code (`claude --version` should be ≥ the version called out in `#ai-help-desk` pinned messages), then retry.
+```text
+/plugin marketplace add thanx-ai/grid#v0.1.0      # tag
+/plugin marketplace add thanx-ai/grid#<branch>     # feature branch you're testing
+/plugin install grid@thanx-ai-grid
+```
 
-To uninstall: `/plugin uninstall grid`.
+**To refresh** the marketplace listing after the repo is updated upstream: `/plugin marketplace update thanx-ai-grid`.
+
+**To uninstall:** `/plugin uninstall grid@thanx-ai-grid`. To also remove the marketplace catalog entry: `/plugin marketplace remove thanx-ai-grid`.
+
+If the `/plugin` commands aren't recognised, your Claude Code is older than the plugin system release — upgrade Claude Code (`claude --version` should be ≥ the version called out in `#ai-help-desk` pinned messages), then retry.
 
 ## Quickstart
 
@@ -53,7 +65,9 @@ gh repo create thanx-ai/<your-username>-grid --private
 cd <your-username>-grid
 claude
 # in the Claude Code session:
-/plugin install thanx-ai/grid
+/plugin marketplace add thanx-ai/grid
+/plugin install grid@thanx-ai-grid
+/reload-plugins
 /grid:setup
 ```
 
