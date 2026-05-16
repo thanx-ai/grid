@@ -51,7 +51,7 @@ export async function main(
 }
 ```
 
-The `Resource<"snowflake">` parameter is the canonical Windmill way to receive a typed DB connection — its concrete value lives in the workspace as a Resource, not in the repo. Lint catches it via the existing `check-variable-references.sh` (resources resolve through the same API).
+The `Resource<"snowflake">` parameter is the canonical Windmill way to receive a typed DB connection — its concrete value lives in the workspace as a Resource, not in the repo. The script author must confirm that a resource of the relevant type exists in the workspace UI before deploy; CI's `check-variable-references.sh` does **not** catch this — it greps for literal `wmill.getResource("f/...")` call sites in source files, and a `Resource<"T">` type parameter is just a TypeScript annotation, not a callable that the grep matches.
 
 Long queries live alongside the script as a sibling `*.sql` file imported via the bundler:
 

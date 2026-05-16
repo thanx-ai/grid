@@ -163,6 +163,11 @@ Then copy each rule file (skip `README.md`, skip files whose name suggests they'
 repo_root="$(git rev-parse --show-toplevel)"
 rules_dir="$repo_root/claude/rules"
 mkdir -p "$rules_dir"
+# Sweep any .tmp.XXXXXX leftovers from a previous interrupted run — the
+# project repo's own .gitignore may not list this pattern, and they'd
+# otherwise show up in `git status` as untracked noise. Safe to delete
+# unconditionally: they're managed-header staging files, no user content.
+rm -f "$rules_dir"/.tmp.* 2>/dev/null || true
 for rule in "$PLUGIN_RULES"/*.md; do
   base=$(basename "$rule")
   case "$base" in
