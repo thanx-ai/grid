@@ -66,7 +66,7 @@ If the skill produces wrong output, edit `skills/<name>/SKILL.md`, reinstall the
 
 ## Adding a new rule
 
-Rules under `claude/rules/` are picked up by Claude at the start of every session in this repo, and copied into project repos by `setup` (Step 6).
+Rules under `claude/rules/` are picked up by Claude at the start of every session in this repo, and copied into project repos by `setup` (Step 4).
 
 To add one:
 
@@ -74,7 +74,7 @@ To add one:
 2. Lead with one sentence summarizing the rule.
 3. Explain _why_ it bit us (what was confusing, what the buggy assumption was).
 4. Explain _how to verify_ (a check, a command, a regex).
-5. Decide whether it applies to project repos. If meta-repo-internal only (e.g. about workflow authoring), add the filename to the skip-list in `skills/setup/SKILL.md` Step 6.
+5. Decide whether it applies to project repos. If meta-repo-internal only (e.g. about workflow authoring), add the filename to the skip-list in `skills/setup/SKILL.md` Step 4.
 
 ## Bumping versions
 
@@ -92,7 +92,7 @@ git tag -f v0
 git push --tags --force-with-lease
 ```
 
-After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md` Step 4 if the bump is minor or major (patches don't change the default).
+After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md` Step 3 (the scaffolded `grid.yml`) if the bump is minor or major (patches don't change the default).
 
 ## Style conventions
 

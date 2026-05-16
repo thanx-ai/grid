@@ -38,7 +38,7 @@ The plugin's `/grid:create` (and sibling scaffolders) asks scope per item. A sin
 
 Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid` at the same ref into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **If you change `scripts/*.sh`, the change ships at the ref the caller pinned — `v0.1.0` callers get `v0.1.0` scripts, not whatever's on master.**
 
-The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 6).
+The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 4).
 
 ### Versioning
 

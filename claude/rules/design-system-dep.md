@@ -59,11 +59,11 @@ Trade-offs:
 
 Don't vendor source files (`.tsx`/`.ts` directly) — copy the pre-built `dist/` artifacts. Source vendoring drags in transitive dev dependencies that the raw_app's `package.json` doesn't declare; the bundle either fails to resolve or silently includes the wrong version.
 
-## What to do when `/grid:import` refuses
+## What to do when `/grid:import` flags a `file:` or submodule dependency
 
-If a source repo's `package.json` has `"@thanx/react": "file:..."` or a `.gitmodules` referencing the design-system repo, `/grid:import` refuses early (Step 2). The two recovery paths:
+If a source repo's `package.json` has `"@thanx/react": "file:..."` or a `.gitmodules` referencing the design-system repo, `/grid:import` Step 2 raises a migration item naming this rule and offers a **proceed / bail** prompt. Two recovery paths to clear the migration item:
 
 1. **Switch the source repo's `package.json` to the registry version** (`"@thanx/react": "^1.4.0"`) before re-running `/grid:import`. Requires the registry path to be live.
 2. **Vendor first, import second.** In the source repo, manually replace the design-system imports with relative imports against a copied `lib/` dir, commit that, then re-run `/grid:import`. The import will see normal relative paths it can carry over.
 
-Either way, the design-system surgery is the user's responsibility — `/grid:import` doesn't try to do it automatically because the publishing/vendoring decision is workspace-architectural, not per-app.
+If you instead pick **Proceed** at the migration prompt, the design-system imports will be carried over verbatim and marked as TODOs in the generated `.raw_app/` — the bundle won't lint until you complete one of the two paths above. Either way, the design-system surgery is the user's responsibility; `/grid:import` doesn't try to do it automatically because the publishing/vendoring decision is workspace-architectural, not per-app.

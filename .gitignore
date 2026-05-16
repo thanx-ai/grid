@@ -19,6 +19,16 @@
 credentials*
 secrets*
 !secrets-template.*
+# Common SSH private key filenames + bare htpasswd
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+id_dsa
+id_dsa.*
+.htpasswd
 
 # Node / runtime
 node_modules/

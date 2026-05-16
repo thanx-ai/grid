@@ -133,7 +133,9 @@ jobs:
     needs: ci
     # No `with: includes:` input — the reusable deploy.yml infers the
     # changed set from the commit range and pushes each item via
-    # `wmill <type> push`. See claude/rules/per-item-push-not-sync.md.
+    # `wmill <type> push`. It never runs `wmill sync push` (see
+    # claude/rules/sync-push-deletes.md for why that would be unsafe
+    # across multiple project repos sharing the same f/ folders).
     uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
@@ -162,7 +164,7 @@ mkdir -p claude/rules
 for rule in "$PLUGIN_RULES"/*.md; do
   base=$(basename "$rule")
   case "$base" in
-    README.md|reusable-workflow-meta-checkout.md|per-item-push-not-sync.md) continue ;;
+    README.md|reusable-workflow-meta-checkout.md|per-item-push-not-sync.md|wmill-sync-includes-flag.md) continue ;;
   esac
   dest="claude/rules/$base"
   # Idempotent: re-copy from the canonical source every run, then ensure the
@@ -170,13 +172,17 @@ for rule in "$PLUGIN_RULES"/*.md; do
   # header lives on the destination side.
   cp "$rule" "$dest"
   if ! head -n 1 "$dest" | grep -q "Managed by grid plugin"; then
-    tmp="$(mktemp)"
+    # mktemp in the destination's directory so the subsequent `mv` is
+    # same-filesystem (avoids EXDEV when /tmp is tmpfs and the repo isn't).
+    tmp="$(mktemp "claude/rules/.tmp.XXXXXX")"
     printf '<!-- Managed by grid plugin. Re-run /grid:setup to refresh. -->\n\n' > "$tmp"
     cat "$dest" >> "$tmp"
     mv "$tmp" "$dest"
   fi
 done
 ```
+
+The skip-list excludes meta-repo-internal rules that don't apply to project repos: `reusable-workflow-meta-checkout.md` (how reusable workflows check out the meta-repo — only relevant when authoring the workflows themselves), `per-item-push-not-sync.md` (rationale for the workflow design — consumers see the behavior, not the implementation), and `wmill-sync-includes-flag.md` (documents an `--includes` knob that the current `deploy.yml` doesn't accept; copying it would mislead project-repo authors).
 
 `per-item-push-not-sync.md` stays meta-repo-internal — project repos consume the deploy behavior but don't need to author against the CLI surface table.
 
@@ -237,7 +243,7 @@ Walk the user through confirming their token actually works against the Grid bef
 > - Build a raw app: `/grid:create`
 > - Import an existing project: `/grid:import`
 >
-> The first push to `master` (or `main`) triggers the deploy workflow. It only pushes items changed in the commit range, one at a time — see `claude/rules/per-item-push-not-sync.md`. Watch the run at `https://github.com/<owner>/<repo>/actions`.
+> The first push to `master` (or `main`) triggers the deploy workflow. It pushes only the items changed in the commit range, one at a time (`wmill <type> push`), and never deletes anything outside the changeset — see `claude/rules/sync-push-deletes.md` for the why. Watch the run at `https://github.com/<owner>/<repo>/actions`.
 
 ## Idempotency
 
