@@ -229,9 +229,21 @@ The deploy workflow needs a Windmill API token stored as a repo secret. **Do not
 
 Without `WMILL_READ_TOKEN` the variable-reference check passes with a loud warning, so it's optional but recommended.
 
-## Step 7: Verify the workspace auth works
+## Step 7: Verify GitHub Actions access + workspace auth
 
-Walk the user through confirming their token actually works against the Grid before they push:
+First, preflight the one setting on `thanx-ai/grid` that breaks every consumer if misconfigured: org-readable reusable workflows. The token they just minted has no bearing here — if `access_level` is `none`, the deploy workflow won't even load (CI fails at 0s with "workflow file issue") regardless of the token.
+
+```bash
+gh api repos/thanx-ai/grid/actions/permissions/access 2>/dev/null || echo '{"access_level":"unreadable"}'
+```
+
+Interpret the `access_level` field:
+
+- `organization` or `enterprise` — good. Continue to the workspace-auth check below.
+- `none` — every project repo's first CI run will fail at 0s with `workflow file issue`. The user can't flip this themselves; the fix is an admin on `thanx-ai/grid` running `gh api -X PUT repos/thanx-ai/grid/actions/permissions/access -f access_level=organization`, or asking in `#ai-help-desk`. Surface this to the user **before** they push — the deploy token is fine, but the workflow won't load.
+- `unreadable` (404/403) — the current user lacks read access to `thanx-ai/grid`'s settings endpoint, which is normal for non-admins. Don't block on it. Note inline: "If your first CI run fails at 0s with `workflow file issue`, the org-access setting on `thanx-ai/grid` is likely the cause — ping `#ai-help-desk`."
+
+Then walk the user through confirming their token actually works against the Grid before they push:
 
 > Quick sanity check — these don't deploy anything, they just confirm the token is good:
 >
