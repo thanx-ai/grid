@@ -61,4 +61,4 @@ Each script does `repo_root="$(git rev-parse --show-toplevel)"` then `cd "$repo_
 
 ## How to verify a change to this pattern
 
-Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-examples` repo's workflow end-to-end (PR CI green, master deploy succeeds). The v0.1.0 `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.
+Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-shared` repo's workflow end-to-end (PR CI green, master deploy succeeds). The v0.1.0 `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.
