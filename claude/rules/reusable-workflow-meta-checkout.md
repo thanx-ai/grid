@@ -1,5 +1,5 @@
 ---
-title: "Reusable workflows: checkout the meta-repo at the caller's pinned ref"
+title: "Reusable workflows: checkout the meta-repo at github.job_workflow_sha"
 tags: [github-actions, reusable-workflow, ci, workflow-design]
 ---
 
@@ -10,37 +10,40 @@ tags: [github-actions, reusable-workflow, ci, workflow-design]
 Every reusable workflow job that invokes a `scripts/` shell script must:
 
 1. Checkout the caller (default `actions/checkout@v6`, which checks out the repo that triggered the workflow).
-2. Compute the meta-repo ref from `GITHUB_WORKFLOW_REF`.
-3. Checkout `thanx-ai/grid` at that ref into a subdirectory (`.grid-meta` by convention).
-4. Invoke the script as `bash .grid-meta/scripts/<name>.sh` from the caller's root.
+2. Checkout `thanx-ai/grid` at **`github.job_workflow_sha`** into `.grid-meta/`.
+3. Invoke the script as `bash .grid-meta/scripts/<name>.sh` from the caller's root.
 
 ```yaml
 - name: Checkout caller repo
   uses: actions/checkout@v6
 
-- name: Resolve meta-repo ref
-  id: meta
-  # GITHUB_WORKFLOW_REF looks like
-  # "thanx-ai/grid/.github/workflows/ci.yml@refs/tags/v0.1.0"
-  # — we want the ref after the '@'.
-  run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
-
 - name: Checkout thanx-ai/grid (for shared scripts)
   uses: actions/checkout@v6
   with:
     repository: thanx-ai/grid
-    ref: ${{ steps.meta.outputs.ref }}
+    ref: ${{ github.job_workflow_sha }}
     path: .grid-meta
 
 - name: Run shared script
   run: bash .grid-meta/scripts/lint-raw-apps.sh
 ```
 
-## Why ref-matching matters
+## Why `github.job_workflow_sha`, not `GITHUB_WORKFLOW_REF`
+
+`github.job_workflow_sha` is documented as "for jobs using a reusable workflow, the commit SHA for the reusable workflow file." It resolves at job-start time to the SHA of THIS reusable workflow, regardless of how the caller pinned it (`@v0.1.0`, `@master`, `@<sha>`). It works for every external caller.
+
+`GITHUB_WORKFLOW_REF` (and the equivalent `github.workflow_ref`) was the previous (broken) approach. It points at the **caller's trigger ref**, not the called reusable workflow's ref. For an external caller:
+
+- PR trigger → `caller-repo/.github/workflows/grid.yml@refs/pull/N/merge`
+- Master push → `caller-repo/.github/workflows/grid.yml@refs/heads/master`
+
+`${GITHUB_WORKFLOW_REF##*@}` then yields `refs/pull/N/merge` or `refs/heads/master`, and `actions/checkout@v6 repository: thanx-ai/grid ref: <that>` fails with `fatal: couldn't find remote ref refs/pull/N/merge` — those refs don't exist in `thanx-ai/grid`. The bug appeared only against external callers because for `self-test.yml` (caller=callee=thanx-ai/grid), `refs/heads/master` does exist locally and the checkout coincidentally succeeds.
+
+## Why ref-matching matters at all
 
 If a caller pins `uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0`, the workflow YAML is loaded at `v0.1.0`. If we then checked out `thanx-ai/grid@master` for the scripts, **the script behavior would drift from the workflow YAML**: a v0.1.0 caller would get whatever `master` looked like the moment the job ran. That defeats the point of pinning a version.
 
-Using `${GITHUB_WORKFLOW_REF##*@}` ensures the scripts ship at the exact same revision as the workflow that referenced them.
+`github.job_workflow_sha` resolves to the exact SHA the workflow YAML was loaded from, so the scripts ship at the same revision as the workflow that referenced them.
 
 ## Why scripts live in `scripts/`, not in the workflow YAML
 
@@ -58,4 +61,4 @@ Each script does `repo_root="$(git rev-parse --show-toplevel)"` then `cd "$repo_
 
 ## How to verify a change to this pattern
 
-Bump the version tag (`v0.1.1`, `v0.2.0`) on this repo, then run the `grid-examples` repo's workflow against the new tag and confirm both CI and deploy succeed end-to-end. The `self-test.yml` here only catches YAML / bash syntax errors — semantic regressions in the checkout flow only surface against a live caller.
+Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-examples` repo's workflow end-to-end (PR CI green, master deploy succeeds). The v0.1.0 `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.

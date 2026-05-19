@@ -38,18 +38,16 @@ jobs:
       - name: Checkout caller repo
         uses: actions/checkout@v6
 
-      - name: Resolve meta-repo ref
-        id: meta
-        # GITHUB_WORKFLOW_REF looks like
-        # "thanx-ai/grid/.github/workflows/ci.yml@refs/tags/v0.1.0"
-        # — we want the ref after the '@'.
-        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout thanx-ai/grid (for shared scripts)
+        # github.job_workflow_sha is the resolved SHA of THIS reusable workflow
+        # file, regardless of how the caller pinned it (tag, branch, SHA). It
+        # works for every caller; GITHUB_WORKFLOW_REF points at the caller's
+        # trigger ref (refs/pull/N/merge, refs/heads/master) which doesn't
+        # exist in this repo. See claude/rules/reusable-workflow-meta-checkout.md.
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 
       - uses: actions/setup-node@v6
@@ -73,15 +71,11 @@ jobs:
       - name: Checkout caller repo
         uses: actions/checkout@v6
 
-      - name: Resolve meta-repo ref
-        id: meta
-        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout thanx-ai/grid (for shared scripts)
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 
       - name: Verify referenced variables / resources exist in prod

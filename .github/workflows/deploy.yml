@@ -61,15 +61,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve meta-repo ref
-        id: meta
-        run: echo "ref=${GITHUB_WORKFLOW_REF##*@}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout thanx-ai/grid (for shared scripts)
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 
       - uses: actions/setup-node@v6
