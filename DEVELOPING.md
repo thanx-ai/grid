@@ -22,7 +22,7 @@ You need:
 - `bash` (Linux/macOS — Windows via WSL).
 - `shellcheck` — `brew install shellcheck` / `apt install shellcheck`.
 - `actionlint` (optional but recommended) — `bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)`.
-- `gh` — for testing workflow changes against `thanx-ai/grid-examples`.
+- `gh` — for testing workflow changes against `thanx-ai/grid-shared`.
 
 You do **not** need:
 
@@ -35,20 +35,20 @@ The self-test workflow (`self-test.yml`) only catches YAML and shell syntax erro
 
 1. Make the change on a feature branch in this repo.
 2. Push the branch.
-3. In `thanx-ai/grid-examples`, temporarily change the workflow ref from `@v0.1.0` (or `@v0`) to `@<your-branch>` in `.github/workflows/grid.yml`.
-4. Open a PR in `grid-examples` against its master to trigger CI. Or push to a branch and `workflow_dispatch`.
+3. In `thanx-ai/grid-shared`, temporarily change the workflow ref from `@v0.1.0` (or `@v0`) to `@<your-branch>` in `.github/workflows/grid.yml`.
+4. Open a PR in `grid-shared` against its master to trigger CI. Or push to a branch and `workflow_dispatch`.
 5. Watch the run in the GitHub Actions tab.
-6. When green, revert the workflow ref in `grid-examples` and merge your meta-repo PR.
+6. When green, revert the workflow ref in `grid-shared` and merge your meta-repo PR.
 
 ```bash
-# In thanx-ai/grid-examples:
+# In thanx-ai/grid-shared:
 sed -i '' 's|@v0\(.[0-9.]*\)\{0,1\}|@<your-branch>|g' .github/workflows/grid.yml
 git checkout -b test-thanx-ai-grid-<your-branch>
 git commit -am "test: pin to <your-branch>"
 gh pr create --draft
 ```
 
-After CI passes, **don't merge the grid-examples test PR** — close it and revert the ref locally.
+After CI passes, **don't merge the grid-shared test PR** — close it and revert the ref locally.
 
 ## Iterating on the plugin
 
@@ -110,7 +110,7 @@ After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md`
 Before tagging a new minor or major:
 
 - [ ] CI green on master (`actionlint` + `shellcheck`)
-- [ ] `grid-examples` workflow passes against the new ref
+- [ ] `grid-shared` workflow passes against the new ref
 - [ ] Changelog entry (if applicable — TBD when we add one)
 - [ ] Tag pushed
 - [ ] `v0`/`v1` moving tag updated

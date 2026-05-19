@@ -15,7 +15,7 @@ Bootstraps an **individual project repo** for safe Windmill development against 
 
 ## When NOT to use
 
-- Already inside `thanx-ai/grid` or `thanx-ai/grid-examples` itself — those repos are the meta-repo and reference template respectively; they don't need bootstrapping.
+- Already inside `thanx-ai/grid` or `thanx-ai/grid-shared` itself — those repos are the meta-repo and reference template respectively; they don't need bootstrapping.
 - `wmill.yaml` already exists and `.github/workflows/grid.yml` is already calling `thanx-ai/grid` workflows — the repo is already set up. Use `/grid:create` or `/grid:import` for per-app work instead.
 
 ## Step 1: Confirm context
@@ -30,7 +30,7 @@ git config user.email
 which gh && gh auth status 2>&1 | head -3 || echo "gh missing or unauthed"
 ```
 
-If `thanx-ai/grid` or `thanx-ai/grid-examples` is the origin, refuse: this skill is for downstream project repos.
+If `thanx-ai/grid` or `thanx-ai/grid-shared` is the origin, refuse: this skill is for downstream project repos.
 
 If `wmill.yaml` already exists, read it. If its `includes:` already covers `f/**`, the repo is set up — tell the user to run `/grid:create` or `/grid:import` instead. If it has a narrower scope from a pre-rename state (e.g. `u/<username>/**` or `f/<dept>/**`), ask whether to widen it to `f/**` and re-scaffold the workflow caller.
 
@@ -215,7 +215,7 @@ The deploy workflow needs a Windmill API token stored as a repo secret. **Do not
 > 1. Mint a deploy token:
 >    - Go to https://grid.thanx.com
 >    - Click your avatar (top-right) → **Account Settings** → **Tokens** → **New Token**
->    - Label it `<repo-name> deploy` (e.g. `grid-examples deploy`)
+>    - Label it `<repo-name> deploy` (e.g. `grid-shared deploy`)
 >    - Leave scopes empty (unscoped) for the simplest setup, or grant: `folders:write, scripts:write, flows:write, apps:write, raw_apps:write, resources:write, variables:write, schedules:write, triggers:write, users:read`
 >    - Copy the token (you'll see it once)
 > 2. Add it as a repo secret:

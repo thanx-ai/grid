@@ -17,7 +17,7 @@ At the start of every session, read every file under `claude/rules/`. Those capt
 1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
 2. **`grid` — a Claude Code plugin** (under `.claude-plugin/` and `skills/`) that bootstraps individual project repos: scaffolds `wmill.yaml`, the repo's thin `.github/workflows/grid.yml`, and copies the conventions in `claude/rules/` into the project repo so future Claude sessions there pick them up.
 
-**There is no `f/` content in this repo.** Grid code lives in each person's own project repo (e.g. `thanx-ai/grid-examples`, which is the canonical reference). If you're tempted to add an `f/<scope>/...` file here, you're solving the wrong problem — it belongs in a project repo.
+**There is no `f/` content in this repo.** Grid code lives in each person's own project repo (e.g. `thanx-ai/grid-shared`, which is the canonical reference). If you're tempted to add an `f/<scope>/...` file here, you're solving the wrong problem — it belongs in a project repo.
 
 ## Architecture
 
@@ -94,10 +94,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/script
 # Tag a release (post-merge to master)
 git tag v0.1.1 && git tag -f v0 && git push --tags --force-with-lease
 
-# Test a workflow change end-to-end against grid-examples
+# Test a workflow change end-to-end against grid-shared
 # 1. Push the change to a branch on this repo
-# 2. In grid-examples, temporarily change @v0.1.0 → @<your-branch>
-# 3. Trigger CI in grid-examples and watch it run against your branch
+# 2. In grid-shared, temporarily change @v0.1.0 → @<your-branch>
+# 3. Trigger CI in grid-shared and watch it run against your branch
 ```
 
 ## What goes where
@@ -115,7 +115,7 @@ When making changes, route by purpose:
 
 ## Self-test CI
 
-`self-test.yml` runs on every PR. It does **not** touch a live Windmill workspace — only actionlint + shellcheck. To catch semantic regressions in the reusable workflows, push a branch and run `grid-examples`'s workflow against it (see Common commands above).
+`self-test.yml` runs on every PR. It does **not** touch a live Windmill workspace — only actionlint + shellcheck. To catch semantic regressions in the reusable workflows, push a branch and run `grid-shared`'s workflow against it (see Common commands above).
 
 ## Conventions
 

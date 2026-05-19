@@ -9,7 +9,7 @@ name: Self-test
 #     shellcheck errors.
 #
 # What this does NOT prove (deferred to integration test against
-# thanx-ai/grid-examples):
+# thanx-ai/grid-shared):
 #   - The reusable workflows actually deploy items end-to-end.
 #   - The scripts work against a live Windmill workspace.
 

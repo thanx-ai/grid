@@ -4,7 +4,7 @@ Reusable GitHub Actions workflows + a Claude Code plugin (`grid`) for shipping t
 
 > **Public repository.** `thanx-ai/grid` ships as a public repo so individual project repos (which may themselves be private) can pull it in via `uses: thanx-ai/grid/...@<ref>` without needing GitHub App tokens for cross-repo workflow access. **Never** commit anything sensitive here: no tokens, no internal hostnames beyond `grid.thanx.com` / `grid-origin.thanx.com`, no real customer data, no `.env` files. The `.gitignore` and CI guards catch the obvious foot-guns; the rest is on us.
 
-This repo is **not** where Grid code lives. It's the shared infrastructure that individual project repos pull in to deploy to the Grid. Apps, scripts, and flows live in each person's own GitHub repo (see [`thanx-ai/grid-examples`](https://github.com/thanx-ai/grid-examples) for the canonical reference).
+This repo is **not** where Grid code lives. It's the shared infrastructure that individual project repos pull in to deploy to the Grid. Apps, scripts, and flows live in each person's own GitHub repo (see [`thanx-ai/grid-shared`](https://github.com/thanx-ai/grid-shared) for the canonical reference).
 
 ## What's here
 
