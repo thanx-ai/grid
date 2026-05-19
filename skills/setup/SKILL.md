@@ -215,7 +215,7 @@ The deploy workflow needs a Windmill API token stored as a repo secret. **Do not
 > 1. Mint a deploy token:
 >    - Go to https://grid.thanx.com
 >    - Click your avatar (top-right) → **Account Settings** → **Tokens** → **New Token**
->    - Label it `<repo-name> deploy` (e.g. `grid-shared deploy`)
+>    - Label it `<repo-name> deploy` (e.g. `my-project deploy`)
 >    - Leave scopes empty (unscoped) for the simplest setup, or grant: `folders:write, scripts:write, flows:write, apps:write, raw_apps:write, resources:write, variables:write, schedules:write, triggers:write, users:read`
 >    - Copy the token (you'll see it once)
 > 2. Add it as a repo secret:
