@@ -1,6 +1,6 @@
 # `wmill sync push` is destructive within its scope
 
-> **The reusable `deploy.yml` does not use `wmill sync push`** — it pushes each item individually with `wmill <type> push`, exactly to avoid the hazard described below. This rule remains here because (a) `sync push` is still useful for local dry-runs and (b) if anyone is ever tempted to add `sync push` back to a workflow, the gotchas should be on the next-door page.
+> **The reusable `deploy.yml` does not use `wmill sync push`** — it pushes each item individually with `wmill <type> push`, exactly to avoid the hazard described below. This rule remains here because (a) `sync push` is still useful for local dry-runs and (b) if anyone is ever tempted to add `sync push` back to a workflow, the gotchas need to be discoverable in the same place that documents the CLI surface.
 
 **Rule.** `wmill sync push` is a diff-and-apply against the remote workspace, scoped by the union of `wmill.yaml` `includes:` / `excludes:` AND any `--includes` patterns on the CLI invocation (comma-separated). Anything that exists on the **remote** but not in the **local** source within that scope is **deleted**. It is not additive-only.
 
@@ -12,7 +12,7 @@ A predecessor repo to `thanx-ai/grid` ran `wmill sync push --yes` from its `depl
 
 That model broke as soon as multiple project repos started writing into the same `f/<dept>/` folder. Any one repo's deploy would silently delete every item another repo owned in that folder. The fix is the **per-item push** model — which is why the current `deploy.yml` doesn't use `sync push` at all and doesn't take an `--includes` input.
 
-Leaving this rule in place because (a) `sync push --dry-run` is still useful locally for diffing what the workspace currently has against what you've changed, and (b) if anyone is tempted to reintroduce `sync push` to a workflow, the trap should be documented on the next-door page.
+Leaving this rule in place because (a) `sync push --dry-run` is still useful locally for diffing what the workspace currently has against what you've changed, and (b) if anyone is tempted to reintroduce `sync push` to a workflow, the trap needs to be documented somewhere obvious — here.
 
 ## How to verify before pushing
 
