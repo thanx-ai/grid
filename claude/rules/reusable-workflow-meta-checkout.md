@@ -30,7 +30,7 @@ Every reusable workflow job that invokes a `scripts/` shell script must:
 
 ## Why `github.job_workflow_sha`, not `GITHUB_WORKFLOW_REF`
 
-`github.job_workflow_sha` is documented as "for jobs using a reusable workflow, the commit SHA for the reusable workflow file." It resolves at job-start time to the SHA of THIS reusable workflow, regardless of how the caller pinned it (`@v0.1.0`, `@master`, `@<sha>`). It works for every external caller.
+`github.job_workflow_sha` is documented as "for jobs using a reusable workflow, the commit SHA for the reusable workflow file." It resolves at job-start time to the SHA of THIS reusable workflow, regardless of how the caller pinned it (`@master`, `@<branch>`, `@<sha>`). It works for every external caller.
 
 `GITHUB_WORKFLOW_REF` (and the equivalent `github.workflow_ref`) was the previous (broken) approach. It points at the **caller's trigger ref**, not the called reusable workflow's ref. For an external caller:
 
@@ -41,9 +41,9 @@ Every reusable workflow job that invokes a `scripts/` shell script must:
 
 ## Why ref-matching matters at all
 
-If a caller pins `uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0`, the workflow YAML is loaded at `v0.1.0`. If we then checked out `thanx-ai/grid@master` for the scripts, **the script behavior would drift from the workflow YAML**: a v0.1.0 caller would get whatever `master` looked like the moment the job ran. That defeats the point of pinning a version.
+Callers pin `uses: thanx-ai/grid/.github/workflows/ci.yml@master`, which resolves to a specific SHA at job-start time. If we then checked out `thanx-ai/grid@master` separately for the scripts, **the script behavior could drift from the workflow YAML mid-run**: GitHub loads the YAML at one SHA, but a second `master` lookup minutes later might land on a fresher commit after another PR merged. The workflow and its scripts would silently disagree.
 
-`github.job_workflow_sha` resolves to the exact SHA the workflow YAML was loaded from, so the scripts ship at the same revision as the workflow that referenced them.
+`github.job_workflow_sha` resolves to the exact SHA the workflow YAML was loaded from, so the scripts ship at the same revision as the workflow that referenced them — even though both sides nominally point at `master`.
 
 ## Why scripts live in `scripts/`, not in the workflow YAML
 
@@ -61,4 +61,4 @@ Each script does `repo_root="$(git rev-parse --show-toplevel)"` then `cd "$repo_
 
 ## How to verify a change to this pattern
 
-Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-shared` repo's workflow end-to-end (PR CI green, master deploy succeeds). The v0.1.0 `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.
+Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-shared` repo's workflow end-to-end (PR CI green, master deploy succeeds). The `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.

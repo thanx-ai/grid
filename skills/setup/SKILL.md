@@ -124,7 +124,7 @@ on:
 
 jobs:
   ci:
-    uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0
+    uses: thanx-ai/grid/.github/workflows/ci.yml@master
     secrets:
       WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 
@@ -136,7 +136,7 @@ jobs:
     # `wmill <type> push`. It never runs `wmill sync push` (see
     # claude/rules/sync-push-deletes.md for why that would be unsafe
     # across multiple project repos sharing the same f/ folders).
-    uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
+    uses: thanx-ai/grid/.github/workflows/deploy.yml@master
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 ```
