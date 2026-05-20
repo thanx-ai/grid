@@ -121,7 +121,11 @@ A single project repo can ship apps to both folders — `/grid:create` asks each
 
 ## Versioning
 
-We ship on `master`. Always pin callers to `@master` — there are no version tags to pick from. Breaking changes are announced via `#ai-help-desk` before they land.
+We ship on `master`. Always pin callers to `@master`. Breaking changes are announced via `#ai-help-desk` before they land.
+
+This is a deliberate trade for a pre-`v1` Thanx-internal repo: every merge to `master` ships to every consumer on their next workflow run, so there's no run-to-run reproducibility and no way to opt out of a breaking change without re-pinning. We accept that because the alternative (every project repo separately tracks tag bumps while the surface is unstable) costs more than it saves. Revisit at `v1`.
+
+Earlier `v0.x` tags still exist on the remote from before this policy landed; they're frozen and won't be updated. Don't pin to them — they exist only so older callers don't break instantly.
 
 ## Help
 

@@ -85,6 +85,8 @@ There is no release step. We ship on `master`: every merge to `master` is live f
 
 For breaking changes (workflow input/secret renames, removed scaffolded files), announce in `#ai-help-desk` **before** merging so consumers can update their callers in lockstep.
 
+**Rollback:** if a merge to `master` ships a regression, open a revert PR and merge it. Every consumer's next workflow run resolves `@master` afresh, so the revert lands automatically — no need to touch consumer repos. For a fast-moving incident, a Thanx-org admin can also push a revert commit directly to `master` (followed by the standard post-incident PR).
+
 ## Style conventions
 
 - Prose: "the Grid" lowercase-determiner. Exact strings preserved: `thanx-ai/grid` (repo), `grid` (plugin name), `# The Grid` (README title). The plugin previously shipped as `thanx-grid` — don't reintroduce that name.
