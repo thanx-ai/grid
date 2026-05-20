@@ -3,24 +3,24 @@ title: "Reusable workflows: checkout the meta-repo at github.job_workflow_sha"
 tags: [github-actions, reusable-workflow, ci, workflow-design]
 ---
 
-`thanx-ai/grid`'s reusable workflows (`ci.yml`, `deploy.yml`) execute shell scripts under `scripts/` that live in this repo, not in the caller. When the workflow runs, the caller's repo is checked out at the workspace root — the meta-repo's scripts aren't on disk unless we explicitly fetch them.
+`thanx-ai/grid-tooling`'s reusable workflows (`ci.yml`, `deploy.yml`) execute shell scripts under `scripts/` that live in this repo, not in the caller. When the workflow runs, the caller's repo is checked out at the workspace root — the meta-repo's scripts aren't on disk unless we explicitly fetch them.
 
 ## The pattern
 
 Every reusable workflow job that invokes a `scripts/` shell script must:
 
 1. Checkout the caller (default `actions/checkout@v6`, which checks out the repo that triggered the workflow).
-2. Checkout `thanx-ai/grid` at **`github.job_workflow_sha`** into `.grid-meta/`.
+2. Checkout `thanx-ai/grid-tooling` at **`github.job_workflow_sha`** into `.grid-meta/`.
 3. Invoke the script as `bash .grid-meta/scripts/<name>.sh` from the caller's root.
 
 ```yaml
 - name: Checkout caller repo
   uses: actions/checkout@v6
 
-- name: Checkout thanx-ai/grid (for shared scripts)
+- name: Checkout thanx-ai/grid-tooling (for shared scripts)
   uses: actions/checkout@v6
   with:
-    repository: thanx-ai/grid
+    repository: thanx-ai/grid-tooling
     ref: ${{ github.job_workflow_sha }}
     path: .grid-meta
 
@@ -37,11 +37,11 @@ Every reusable workflow job that invokes a `scripts/` shell script must:
 - PR trigger → `caller-repo/.github/workflows/grid.yml@refs/pull/N/merge`
 - Master push → `caller-repo/.github/workflows/grid.yml@refs/heads/master`
 
-`${GITHUB_WORKFLOW_REF##*@}` then yields `refs/pull/N/merge` or `refs/heads/master`, and `actions/checkout@v6 repository: thanx-ai/grid ref: <that>` fails with `fatal: couldn't find remote ref refs/pull/N/merge` — those refs don't exist in `thanx-ai/grid`. The bug appeared only against external callers because for `self-test.yml` (caller=callee=thanx-ai/grid), `refs/heads/master` does exist locally and the checkout coincidentally succeeds.
+`${GITHUB_WORKFLOW_REF##*@}` then yields `refs/pull/N/merge` or `refs/heads/master`, and `actions/checkout@v6 repository: thanx-ai/grid-tooling ref: <that>` fails with `fatal: couldn't find remote ref refs/pull/N/merge` — those refs don't exist in `thanx-ai/grid-tooling`. The bug appeared only against external callers because for `self-test.yml` (caller=callee=thanx-ai/grid-tooling), `refs/heads/master` does exist locally and the checkout coincidentally succeeds.
 
 ## Why ref-matching matters at all
 
-Callers pin `uses: thanx-ai/grid/.github/workflows/ci.yml@master`, which resolves to a specific SHA at job-start time. If we then checked out `thanx-ai/grid@master` separately for the scripts, **the script behavior could drift from the workflow YAML mid-run**: GitHub loads the YAML at one SHA, but a second `master` lookup minutes later might land on a fresher commit after another PR merged. The workflow and its scripts would silently disagree.
+Callers pin `uses: thanx-ai/grid-tooling/.github/workflows/ci.yml@master`, which resolves to a specific SHA at job-start time. If we then checked out `thanx-ai/grid-tooling@master` separately for the scripts, **the script behavior could drift from the workflow YAML mid-run**: GitHub loads the YAML at one SHA, but a second `master` lookup minutes later might land on a fresher commit after another PR merged. The workflow and its scripts would silently disagree.
 
 `github.job_workflow_sha` resolves to the exact SHA the workflow YAML was loaded from, so the scripts ship at the same revision as the workflow that referenced them — even though both sides nominally point at `master`.
 

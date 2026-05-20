@@ -4,7 +4,7 @@ Guidance for Claude Code working in this repo.
 
 ## This is a public repo
 
-`thanx-ai/grid` is published as a public GitHub repo. **Never write anything sensitive into this tree** — no tokens, deploy keys, API secrets, internal-only URLs (besides the already-public `grid.thanx.com` / `grid-origin.thanx.com`), customer data, employee PII, or `.env` files. If you're about to commit anything that looks like a credential, stop and route it to the consuming repo's GitHub Actions secrets instead. The `.gitignore` covers obvious files (`.env`, `.env.*`, `.wmill/`) but it can't catch a token hardcoded into a workflow YAML — review every diff with that lens before pushing.
+`thanx-ai/grid-tooling` is published as a public GitHub repo. **Never write anything sensitive into this tree** — no tokens, deploy keys, API secrets, internal-only URLs (besides the already-public `grid.thanx.com` / `grid-origin.thanx.com`), customer data, employee PII, or `.env` files. If you're about to commit anything that looks like a credential, stop and route it to the consuming repo's GitHub Actions secrets instead. The `.gitignore` covers obvious files (`.env`, `.env.*`, `.wmill/`) but it can't catch a token hardcoded into a workflow YAML — review every diff with that lens before pushing.
 
 ## Read first
 
@@ -12,9 +12,9 @@ At the start of every session, read every file under `claude/rules/`. Those capt
 
 ## What this repo is
 
-`thanx-ai/grid` is a **meta-repo**, not a content repo. It ships two things:
+`thanx-ai/grid-tooling` is a **meta-repo**, not a content repo. It ships two things:
 
-1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid/.github/workflows/deploy.yml@master`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
+1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
 2. **`grid` — a Claude Code plugin** (under `.claude-plugin/` and `skills/`) that bootstraps individual project repos: scaffolds `wmill.yaml`, the repo's thin `.github/workflows/grid.yml`, and copies the conventions in `claude/rules/` into the project repo so future Claude sessions there pick them up.
 
 **There is no `f/` content in this repo.** Grid code lives in each person's own project repo (e.g. `thanx-ai/grid-shared`, which is the canonical reference). If you're tempted to add an `f/<scope>/...` file here, you're solving the wrong problem — it belongs in a project repo.
@@ -36,13 +36,13 @@ The plugin's `/grid:create` (and sibling scaffolders) asks scope per item. A sin
 
 ### Reusable workflows
 
-Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid` at the same SHA into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **Within a single run the scripts always match the workflow YAML — `github.job_workflow_sha` resolves to the exact SHA the YAML was loaded from. Across runs, every caller is on `@master` and picks up the latest merge.**
+Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid-tooling` at the same SHA into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **Within a single run the scripts always match the workflow YAML — `github.job_workflow_sha` resolves to the exact SHA the YAML was loaded from. Across runs, every caller is on `@master` and picks up the latest merge.**
 
 The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 4).
 
 ### Versioning
 
-We ship on `master`. Callers pin `uses: thanx-ai/grid/.github/workflows/<name>.yml@master` and pick up every merge automatically — there are no version tags. Within a single workflow run the scripts stay consistent with the YAML because the meta-checkout uses `github.job_workflow_sha` (see [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md)); across runs, callers get whatever's on `master` at job-start time — by design.
+We ship on `master`. Callers pin `uses: thanx-ai/grid-tooling/.github/workflows/<name>.yml@master` and pick up every merge automatically — there are no version tags. Within a single workflow run the scripts stay consistent with the YAML because the meta-checkout uses `github.job_workflow_sha` (see [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md)); across runs, callers get whatever's on `master` at job-start time — by design.
 
 Because every merge is a live release, treat every PR like one: don't merge anything to `master` that you wouldn't want every project repo running on its next deploy. Breaking changes to workflow inputs, secret names, or scaffolded files need to be announced in `#ai-help-desk` before they land.
 
@@ -107,7 +107,7 @@ When making changes, route by purpose:
 - Plugin skills live at `skills/<name>/SKILL.md`. The filename is fixed; the directory name is the skill name.
 - Scripts use `bash`, are `set -euo pipefail`, and pass shellcheck. No silent fallbacks — fail loud.
 - Workflow YAML files use 2-space indent. Inputs and secrets are explicitly typed and described.
-- "the Grid" in prose; `thanx-ai/grid` (repo slug) and `grid` (plugin name) are exact strings preserved as-is. The plugin used to be called `thanx-grid` — don't reintroduce that name.
+- "the Grid" in prose; `thanx-ai/grid-tooling` (repo slug) and `grid` (plugin name) are exact strings preserved as-is. The plugin used to be called `thanx-grid` — don't reintroduce that name.
 - Help / access questions: `#ai-help-desk` Slack channel. The GitHub team reviewer is `@eng-platform` (it exists as a GitHub team; the Slack channel of that name does not).
 
 ## Capture friction as rules

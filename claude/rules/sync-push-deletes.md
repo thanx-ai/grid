@@ -8,7 +8,7 @@ The Windmill docs are explicit: _"sync... will override any item that is within 
 
 ## Historical context: why a predecessor repo used `sync push --includes`
 
-A predecessor repo to `thanx-ai/grid` ran `wmill sync push --yes` from its `deploy.yml` with a hand-maintained comma-separated `--includes` list of `f/<team>/**` patterns. That worked because exactly one repo owned `f/**` — the deploy could safely "if it's not in the source, delete it from the remote" within those folders.
+A predecessor repo to `thanx-ai/grid-tooling` ran `wmill sync push --yes` from its `deploy.yml` with a hand-maintained comma-separated `--includes` list of `f/<team>/**` patterns. That worked because exactly one repo owned `f/**` — the deploy could safely "if it's not in the source, delete it from the remote" within those folders.
 
 That model broke as soon as multiple project repos started writing into the same `f/<dept>/` folder. Any one repo's deploy would silently delete every item another repo owned in that folder. The fix is the **per-item push** model — which is why the current `deploy.yml` doesn't use `sync push` at all and doesn't take an `--includes` input.
 

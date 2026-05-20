@@ -6,7 +6,7 @@ name: Grid Deploy (reusable)
 #     deploy:
 #       if: github.ref == 'refs/heads/master'
 #       needs: ci
-#       uses: thanx-ai/grid/.github/workflows/deploy.yml@master
+#       uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master
 #       secrets:
 #         WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 #
@@ -61,10 +61,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout thanx-ai/grid (for shared scripts)
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
         uses: actions/checkout@v6
         with:
-          repository: thanx-ai/grid
+          repository: thanx-ai/grid-tooling
           ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 

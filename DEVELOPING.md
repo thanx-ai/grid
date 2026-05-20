@@ -1,4 +1,4 @@
-# Developing `thanx-ai/grid`
+# Developing `thanx-ai/grid-tooling`
 
 This doc covers developing the reusable workflows and the `grid` Claude Code plugin **in this repo**. For working in a project repo against the Grid (the consumer side), see the rules under `claude/rules/` — they're copied into each project repo by the `setup` skill.
 
@@ -54,18 +54,18 @@ After CI passes, **don't merge the grid-shared test PR** — close it and revert
 
 Plugin skills are markdown files under `skills/<name>/SKILL.md`. They're read by Claude Code at invocation time; no compilation step. To test locally:
 
-1. Push your feature branch to `thanx-ai/grid`, then register the marketplace pointing at that branch:
+1. Push your feature branch to `thanx-ai/grid-tooling`, then register the marketplace pointing at that branch:
    ```text
-   /plugin marketplace add thanx-ai/grid#<your-branch>
-   /plugin install grid@thanx-ai-grid
+   /plugin marketplace add thanx-ai/grid-tooling#<your-branch>
+   /plugin install grid@thanx-ai-grid-tooling
    /reload-plugins
    ```
-   (If the marketplace was already registered against a different ref, run `/plugin marketplace update thanx-ai-grid` to refresh after pushing.)
+   (If the marketplace was already registered against a different ref, run `/plugin marketplace update thanx-ai-grid-tooling` to refresh after pushing.)
 2. Open a fresh test repo (`mkdir /tmp/grid-test && cd /tmp/grid-test && git init`).
 3. Run the skill: `/grid:setup`.
 4. Inspect the scaffolded files and the bundled-rules copy.
 
-If the skill produces wrong output, edit `skills/<name>/SKILL.md`, push to your branch, run `/plugin marketplace update thanx-ai-grid` to refresh, and re-test.
+If the skill produces wrong output, edit `skills/<name>/SKILL.md`, push to your branch, run `/plugin marketplace update thanx-ai-grid-tooling` to refresh, and re-test.
 
 ## Adding a new rule
 
@@ -89,7 +89,7 @@ For breaking changes (workflow input/secret renames, removed scaffolded files), 
 
 ## Style conventions
 
-- Prose: "the Grid" lowercase-determiner. Exact strings preserved: `thanx-ai/grid` (repo), `grid` (plugin name), `# The Grid` (README title). The plugin previously shipped as `thanx-grid` — don't reintroduce that name.
+- Prose: "the Grid" lowercase-determiner. Exact strings preserved: `thanx-ai/grid-tooling` (repo), `grid` (plugin name), `# The Grid` (README title). The plugin previously shipped as `thanx-grid` — don't reintroduce that name.
 - Slack: `#ai-help-desk` for all access/help/bug questions. There is no `#eng-platform` channel.
 - GitHub: `@eng-platform` is the review team.
 - Skill `description:` frontmatter must include trigger phrases the user is likely to type (e.g. "set up grid", "bootstrap grid in this repo").

@@ -4,7 +4,7 @@ name: Grid CI (reusable)
 #
 #   jobs:
 #     ci:
-#       uses: thanx-ai/grid/.github/workflows/ci.yml@master
+#       uses: thanx-ai/grid-tooling/.github/workflows/ci.yml@master
 #       secrets:
 #         WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 #
@@ -38,7 +38,7 @@ jobs:
       - name: Checkout caller repo
         uses: actions/checkout@v6
 
-      - name: Checkout thanx-ai/grid (for shared scripts)
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
         # github.job_workflow_sha is the resolved SHA of THIS reusable workflow
         # file, regardless of how the caller pinned it (tag, branch, SHA). It
         # works for every caller; GITHUB_WORKFLOW_REF points at the caller's
@@ -46,7 +46,7 @@ jobs:
         # exist in this repo. See claude/rules/reusable-workflow-meta-checkout.md.
         uses: actions/checkout@v6
         with:
-          repository: thanx-ai/grid
+          repository: thanx-ai/grid-tooling
           ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 
@@ -71,10 +71,10 @@ jobs:
       - name: Checkout caller repo
         uses: actions/checkout@v6
 
-      - name: Checkout thanx-ai/grid (for shared scripts)
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
         uses: actions/checkout@v6
         with:
-          repository: thanx-ai/grid
+          repository: thanx-ai/grid-tooling
           ref: ${{ github.job_workflow_sha }}
           path: .grid-meta
 
