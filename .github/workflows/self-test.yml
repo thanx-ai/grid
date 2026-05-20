@@ -1,7 +1,7 @@
 name: Self-test
 
 # This repo's own CI — runs on every PR and push to master against
-# thanx-ai/grid itself. Doesn't touch any external Windmill workspace.
+# thanx-ai/grid-tooling itself. Doesn't touch any external Windmill workspace.
 #
 # What this proves:
 #   - The reusable workflow YAML is well-formed (actionlint).

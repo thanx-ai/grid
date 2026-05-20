@@ -2,7 +2,7 @@
 
 Reusable GitHub Actions workflows + a Claude Code plugin (`grid`) for shipping to **Grid** — Thanx's self-hosted [Windmill](https://windmill.dev) workspace at `https://grid.thanx.com`.
 
-> **Public repository.** `thanx-ai/grid` ships as a public repo so individual project repos (which may themselves be private) can pull it in via `uses: thanx-ai/grid/...@<ref>` without needing GitHub App tokens for cross-repo workflow access. **Never** commit anything sensitive here: no tokens, no internal hostnames beyond `grid.thanx.com` / `grid-origin.thanx.com`, no real customer data, no `.env` files. The `.gitignore` and CI guards catch the obvious foot-guns; the rest is on us.
+> **Public repository.** `thanx-ai/grid-tooling` ships as a public repo so individual project repos (which may themselves be private) can pull it in via `uses: thanx-ai/grid-tooling/...@<ref>` without needing GitHub App tokens for cross-repo workflow access. **Never** commit anything sensitive here: no tokens, no internal hostnames beyond `grid.thanx.com` / `grid-origin.thanx.com`, no real customer data, no `.env` files. The `.gitignore` and CI guards catch the obvious foot-guns; the rest is on us.
 
 This repo is **not** where Grid code lives. It's the shared infrastructure that individual project repos pull in to deploy to the Grid. Apps, scripts, and flows live in each person's own GitHub repo (see [`thanx-ai/grid-shared`](https://github.com/thanx-ai/grid-shared) for the canonical reference).
 
@@ -35,23 +35,23 @@ Claude Code uses a two-step marketplace + plugin model. Register this repo as a 
 
 ```text
 # In any Claude Code session:
-/plugin marketplace add thanx-ai/grid
-/plugin install grid@thanx-ai-grid
+/plugin marketplace add thanx-ai/grid-tooling
+/plugin install grid@thanx-ai-grid-tooling
 /reload-plugins
 ```
 
-The marketplace name is auto-derived from the repo slug (`thanx-ai/grid` → `thanx-ai-grid`). After install + reload, subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
+The marketplace name is auto-derived from the repo slug (`thanx-ai/grid-tooling` → `thanx-ai-grid-tooling`). After install + reload, subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
 
 **To pin a specific ref** at marketplace-add time, append `#<ref>` to the slug. We ship on `master`, so the unpinned form is the normal path; `#<branch>` is for testing a feature branch:
 
 ```text
-/plugin marketplace add thanx-ai/grid#<branch>     # feature branch you're testing
-/plugin install grid@thanx-ai-grid
+/plugin marketplace add thanx-ai/grid-tooling#<branch>     # feature branch you're testing
+/plugin install grid@thanx-ai-grid-tooling
 ```
 
-**To refresh** the marketplace listing after the repo is updated upstream: `/plugin marketplace update thanx-ai-grid`.
+**To refresh** the marketplace listing after the repo is updated upstream: `/plugin marketplace update thanx-ai-grid-tooling`.
 
-**To uninstall:** `/plugin uninstall grid@thanx-ai-grid`. To also remove the marketplace catalog entry: `/plugin marketplace remove thanx-ai-grid`.
+**To uninstall:** `/plugin uninstall grid@thanx-ai-grid-tooling`. To also remove the marketplace catalog entry: `/plugin marketplace remove thanx-ai-grid-tooling`.
 
 If the `/plugin` commands aren't recognised, your Claude Code is older than the plugin system release — upgrade Claude Code (`claude --version` should be ≥ the version called out in `#ai-help-desk` pinned messages), then retry.
 
@@ -64,8 +64,8 @@ gh repo create thanx-ai/<your-username>-grid --private
 cd <your-username>-grid
 claude
 # in the Claude Code session:
-/plugin marketplace add thanx-ai/grid
-/plugin install grid@thanx-ai-grid
+/plugin marketplace add thanx-ai/grid-tooling
+/plugin install grid@thanx-ai-grid-tooling
 /reload-plugins
 /grid:setup
 ```
@@ -87,7 +87,7 @@ on:
 
 jobs:
   ci:
-    uses: thanx-ai/grid/.github/workflows/ci.yml@master
+    uses: thanx-ai/grid-tooling/.github/workflows/ci.yml@master
     secrets:
       WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 
@@ -97,7 +97,7 @@ jobs:
     # No `with: includes:` input — deploy.yml infers the set from the commit
     # range and pushes each item with `wmill <type> push`. See
     # claude/rules/per-item-push-not-sync.md.
-    uses: thanx-ai/grid/.github/workflows/deploy.yml@master
+    uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 ```

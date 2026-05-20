@@ -35,7 +35,7 @@ Windmill exposes a workspace-scoped private npm proxy at `/w/<workspace>/npm_pro
 //grid-origin.thanx.com/api/w/thanx/npm_proxy/:_authToken=${WINDMILL_NPM_TOKEN}
 ```
 
-**Token discipline.** The `${WINDMILL_NPM_TOKEN}` must remain an env-var reference and **never** be replaced with a literal token. A bare `.npmrc` entry in `.gitignore` (no leading slash) matches at any directory depth — so a nested `<scope>/<name>.raw_app/.npmrc` is covered as long as the project repo's `.gitignore` has that line. **`/grid:setup` does not scaffold a `.gitignore`**, so confirm the project repo has the entry before committing anything that references the npm proxy. The repo-root `.gitignore` in `thanx-ai/grid` has it; this project repo's may or may not.
+**Token discipline.** The `${WINDMILL_NPM_TOKEN}` must remain an env-var reference and **never** be replaced with a literal token. A bare `.npmrc` entry in `.gitignore` (no leading slash) matches at any directory depth — so a nested `<scope>/<name>.raw_app/.npmrc` is covered as long as the project repo's `.gitignore` has that line. **`/grid:setup` does not scaffold a `.gitignore`**, so confirm the project repo has the entry before committing anything that references the npm proxy. The repo-root `.gitignore` in `thanx-ai/grid-tooling` has it; this project repo's may or may not.
 
 The publishing side (how `@thanx/react@1.4.0` gets into the workspace proxy) lives in the design-system repo, not in project repos consuming it. Until that publish pipeline exists, fall back to the vendor path.
 

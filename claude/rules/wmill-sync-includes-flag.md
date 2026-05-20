@@ -2,7 +2,7 @@
 
 **Rule.** When narrowing the scope of `wmill sync push` or `wmill sync pull` on the command line, pass a single `--includes` flag whose value is a **comma-separated** list of glob patterns. The CLI does not accept a repeated `--include` (singular) flag — it errors out with `Unknown option "--include". Did you mean option "--includes"?` and exits non-zero before contacting the server.
 
-This bit us when `.github/workflows/deploy.yml` shipped fourteen repeated `--include 'f/<team>/**'` lines (one per grid-owned folder). The previous wmill CLI silently accepted the unknown flag; **windmill-cli 1.700.1** treats it as a hard error, so every `master` push failed in the `Deploy to Grid` job before any `wmill sync` work happened. See run [25787264701](https://github.com/thanx-ai/grid/actions/runs/25787264701/job/75743601252).
+This bit us when `.github/workflows/deploy.yml` shipped fourteen repeated `--include 'f/<team>/**'` lines (one per grid-owned folder). The previous wmill CLI silently accepted the unknown flag; **windmill-cli 1.700.1** treats it as a hard error, so every `master` push failed in the `Deploy to Grid` job before any `wmill sync` work happened. See run [25787264701](https://github.com/thanx-ai/grid-tooling/actions/runs/25787264701/job/75743601252).
 
 The companion flag is `--extra-includes` (also plural, also comma-separated) — useful when you want to union additional patterns on top of the `includes:` list in `wmill.yaml` without rewriting it.
 

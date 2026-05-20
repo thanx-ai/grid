@@ -1,6 +1,6 @@
 ---
 name: setup
-description: ONE-TIME bootstrap for a new project repo that will deploy to Thanx Grid. Wires up `wmill.yaml`, a `.github/workflows/grid.yml` that calls the reusable workflows in `thanx-ai/grid`, mints the deploy token, and copies the Grid conventions into `claude/rules/`. **This is the repo-level setup — not for creating individual apps.** Use `/grid:create` to add a new raw_app, or `/grid:import` to bring in an existing project. Use this skill when a user says "set up grid", "bootstrap grid in this repo", "configure wmill for grid", or "add grid deploy to this repo".
+description: ONE-TIME bootstrap for a new project repo that will deploy to Thanx Grid. Wires up `wmill.yaml`, a `.github/workflows/grid.yml` that calls the reusable workflows in `thanx-ai/grid-tooling`, mints the deploy token, and copies the Grid conventions into `claude/rules/`. **This is the repo-level setup — not for creating individual apps.** Use `/grid:create` to add a new raw_app, or `/grid:import` to bring in an existing project. Use this skill when a user says "set up grid", "bootstrap grid in this repo", "configure wmill for grid", or "add grid deploy to this repo".
 ---
 
 # setup
@@ -15,8 +15,8 @@ Bootstraps an **individual project repo** for safe Windmill development against 
 
 ## When NOT to use
 
-- Already inside `thanx-ai/grid` or `thanx-ai/grid-shared` itself — those repos are the meta-repo and reference template respectively; they don't need bootstrapping.
-- `wmill.yaml` already exists and `.github/workflows/grid.yml` is already calling `thanx-ai/grid` workflows — the repo is already set up. Use `/grid:create` or `/grid:import` for per-app work instead.
+- Already inside `thanx-ai/grid-tooling` or `thanx-ai/grid-shared` itself — those repos are the meta-repo and reference template respectively; they don't need bootstrapping.
+- `wmill.yaml` already exists and `.github/workflows/grid.yml` is already calling `thanx-ai/grid-tooling` workflows — the repo is already set up. Use `/grid:create` or `/grid:import` for per-app work instead.
 
 ## Step 1: Confirm context
 
@@ -30,7 +30,7 @@ git config user.email
 which gh && gh auth status 2>&1 | head -3 || echo "gh missing or unauthed"
 ```
 
-If `thanx-ai/grid` or `thanx-ai/grid-shared` is the origin, refuse: this skill is for downstream project repos.
+If `thanx-ai/grid-tooling` or `thanx-ai/grid-shared` is the origin, refuse: this skill is for downstream project repos.
 
 If `wmill.yaml` already exists, read it. If its `includes:` already covers `f/**`, the repo is set up — tell the user to run `/grid:create` or `/grid:import` instead. If it has a narrower scope from a pre-rename state (e.g. `u/<username>/**` or `f/<dept>/**`), ask whether to widen it to `f/**` and re-scaffold the workflow caller.
 
@@ -112,7 +112,7 @@ includeKey: false
 
 ## Step 3: Scaffold `.github/workflows/grid.yml`
 
-This is the thin caller that wires the project repo into `thanx-ai/grid`'s reusable workflows.
+This is the thin caller that wires the project repo into `thanx-ai/grid-tooling`'s reusable workflows.
 
 ```yaml
 name: Grid
@@ -124,7 +124,7 @@ on:
 
 jobs:
   ci:
-    uses: thanx-ai/grid/.github/workflows/ci.yml@master
+    uses: thanx-ai/grid-tooling/.github/workflows/ci.yml@master
     secrets:
       WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 
@@ -136,7 +136,7 @@ jobs:
     # `wmill <type> push`. It never runs `wmill sync push` (see
     # claude/rules/sync-push-deletes.md for why that would be unsafe
     # across multiple project repos sharing the same f/ folders).
-    uses: thanx-ai/grid/.github/workflows/deploy.yml@master
+    uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 ```
@@ -153,7 +153,7 @@ Locate the plugin's `claude/rules/` directory. Try in order:
 
 1. `$HOME/.claude/plugins/grid/claude/rules/` — default Claude Code plugin install path
 2. Search via `find $HOME/.claude/plugins -type d -name rules -path '*grid*' 2>/dev/null`
-3. If the user has a local clone of `thanx-ai/grid` (look at common dev paths: `$HOME/code/grid`, `$HOME/src/thanx-ai/grid`, `$HOME/dev/grid`), use its `claude/rules/`
+3. If the user has a local clone of `thanx-ai/grid-tooling` (look at common dev paths: `$HOME/code/grid`, `$HOME/src/thanx-ai/grid-tooling`, `$HOME/dev/grid`), use its `claude/rules/`
 
 If none resolve, ask the user where their `grid` plugin is installed and use that. Store the resolved path as `$PLUGIN_RULES`.
 
@@ -203,7 +203,7 @@ Append to `CLAUDE.md` (or create if missing):
 ```markdown
 ## Grid conventions
 
-This repo deploys to Thanx Grid via the reusable workflows in [`thanx-ai/grid`](https://github.com/thanx-ai/grid). At the start of every session, read every file under `claude/rules/` — those capture gotchas that bit us in past sessions and are managed by the `grid` Claude Code plugin.
+This repo deploys to Thanx Grid via the reusable workflows in [`thanx-ai/grid-tooling`](https://github.com/thanx-ai/grid-tooling). At the start of every session, read every file under `claude/rules/` — those capture gotchas that bit us in past sessions and are managed by the `grid` Claude Code plugin.
 
 Each app, script, or flow picks its own scope folder (`f/company/` or `f/<dept>/`) at scaffold time via `/grid:create` or `/grid:import`. Edits in the repo are the source of truth; merges to the default branch auto-deploy via `.github/workflows/grid.yml`.
 ```
@@ -231,17 +231,17 @@ Without `WMILL_READ_TOKEN` the variable-reference check passes with a loud warni
 
 ## Step 7: Verify GitHub Actions access + workspace auth
 
-First, preflight the one setting on `thanx-ai/grid` that breaks every consumer if misconfigured: org-readable reusable workflows. The token they just minted has no bearing here — if `access_level` is `none`, the deploy workflow won't even load (CI fails at 0s with "workflow file issue") regardless of the token.
+First, preflight the one setting on `thanx-ai/grid-tooling` that breaks every consumer if misconfigured: org-readable reusable workflows. The token they just minted has no bearing here — if `access_level` is `none`, the deploy workflow won't even load (CI fails at 0s with "workflow file issue") regardless of the token.
 
 ```bash
-gh api repos/thanx-ai/grid/actions/permissions/access 2>/dev/null || echo '{"access_level":"unreadable"}'
+gh api repos/thanx-ai/grid-tooling/actions/permissions/access 2>/dev/null || echo '{"access_level":"unreadable"}'
 ```
 
 Interpret the `access_level` field:
 
 - `organization` or `enterprise` — good. Continue to the workspace-auth check below.
-- `none` — every project repo's first CI run will fail at 0s with `workflow file issue`. The user can't flip this themselves; the fix is an admin on `thanx-ai/grid` running `gh api -X PUT repos/thanx-ai/grid/actions/permissions/access -f access_level=organization`, or asking in `#ai-help-desk`. Surface this to the user **before** they push — the deploy token is fine, but the workflow won't load.
-- `unreadable` (404/403) — the current user lacks read access to `thanx-ai/grid`'s settings endpoint, which is normal for non-admins. Don't block on it. Note inline: "If your first CI run fails at 0s with `workflow file issue`, the org-access setting on `thanx-ai/grid` is likely the cause — ping `#ai-help-desk`."
+- `none` — every project repo's first CI run will fail at 0s with `workflow file issue`. The user can't flip this themselves; the fix is an admin on `thanx-ai/grid-tooling` running `gh api -X PUT repos/thanx-ai/grid-tooling/actions/permissions/access -f access_level=organization`, or asking in `#ai-help-desk`. Surface this to the user **before** they push — the deploy token is fine, but the workflow won't load.
+- `unreadable` (404/403) — the current user lacks read access to `thanx-ai/grid-tooling`'s settings endpoint, which is normal for non-admins. Don't block on it. Note inline: "If your first CI run fails at 0s with `workflow file issue`, the org-access setting on `thanx-ai/grid-tooling` is likely the cause — ping `#ai-help-desk`."
 
 Then walk the user through confirming their token actually works against the Grid before they push:
 
