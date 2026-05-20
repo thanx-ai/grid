@@ -14,7 +14,7 @@ At the start of every session, read every file under `claude/rules/`. Those capt
 
 `thanx-ai/grid` is a **meta-repo**, not a content repo. It ships two things:
 
-1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
+1. **Reusable GitHub Actions workflows** (`.github/workflows/ci.yml`, `deploy.yml`) that project repos call via `uses: thanx-ai/grid/.github/workflows/deploy.yml@master`. The deploy workflow does **per-item** `wmill <type> push` against the Grid (`https://grid.thanx.com`) — never `wmill sync push`, because that would let one project repo's deploy delete items owned by another. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md).
 2. **`grid` — a Claude Code plugin** (under `.claude-plugin/` and `skills/`) that bootstraps individual project repos: scaffolds `wmill.yaml`, the repo's thin `.github/workflows/grid.yml`, and copies the conventions in `claude/rules/` into the project repo so future Claude sessions there pick them up.
 
 **There is no `f/` content in this repo.** Grid code lives in each person's own project repo (e.g. `thanx-ai/grid-shared`, which is the canonical reference). If you're tempted to add an `f/<scope>/...` file here, you're solving the wrong problem — it belongs in a project repo.
@@ -36,27 +36,15 @@ The plugin's `/grid:create` (and sibling scaffolders) asks scope per item. A sin
 
 ### Reusable workflows
 
-Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid` at the same ref into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **If you change `scripts/*.sh`, the change ships at the ref the caller pinned — `v0.1.0` callers get `v0.1.0` scripts, not whatever's on master.**
+Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid` at the same SHA into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **Within a single run the scripts always match the workflow YAML — `github.job_workflow_sha` resolves to the exact SHA the YAML was loaded from. Across runs, every caller is on `@master` and picks up the latest merge.**
 
 The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 4).
 
 ### Versioning
 
-Every change that affects the public surface of `ci.yml`, `deploy.yml`, or the plugin's scaffolds requires a version bump:
+We ship on `master`. Callers pin `uses: thanx-ai/grid/.github/workflows/<name>.yml@master` and pick up every merge automatically — there are no version tags. Within a single workflow run the scripts stay consistent with the YAML because the meta-checkout uses `github.job_workflow_sha` (see [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md)); across runs, callers get whatever's on `master` at job-start time — by design.
 
-- **Patch** (`v0.1.0` → `v0.1.1`) — bug fixes, internal script tweaks that don't change inputs/outputs.
-- **Minor** (`v0.1.0` → `v0.2.0`) — new optional inputs, new optional skill steps. Backward-compatible.
-- **Major** (`v0.x` → `v1.0`) — breaking changes to workflow inputs, secret names, or scaffolded files.
-
-The moving major tag (`v0`, `v1`) tracks the latest minor/patch in that line so callers pinning `@v0` get rolling updates within `0.x`. After a release, run:
-
-```bash
-git tag v0.1.1
-git tag -f v0
-git push --tags --force-with-lease
-```
-
-While the plugin and workflows are unstable (pre-`v1`), bumps happen liberally. Once at `v1`, breaking changes are rare and well-announced.
+Because every merge is a live release, treat every PR like one: don't merge anything to `master` that you wouldn't want every project repo running on its next deploy. Breaking changes to workflow inputs, secret names, or scaffolded files need to be announced in `#ai-help-desk` before they land.
 
 ## Layout
 
@@ -91,12 +79,9 @@ bash -n scripts/*.sh
 bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
 ./actionlint -color
 
-# Tag a release (post-merge to master)
-git tag v0.1.1 && git tag -f v0 && git push --tags --force-with-lease
-
 # Test a workflow change end-to-end against grid-shared
 # 1. Push the change to a branch on this repo
-# 2. In grid-shared, temporarily change @v0.1.0 → @<your-branch>
+# 2. In grid-shared, temporarily change @master → @<your-branch>
 # 3. Trigger CI in grid-shared and watch it run against your branch
 ```
 
@@ -104,14 +89,14 @@ git tag v0.1.1 && git tag -f v0 && git push --tags --force-with-lease
 
 When making changes, route by purpose:
 
-| Change                                    | File(s) to touch                                       |
-| ----------------------------------------- | ------------------------------------------------------ |
-| Bug in lint/check/test bash script        | `scripts/<name>.sh` — patch bump                       |
-| New optional workflow input               | `.github/workflows/<name>.yml` — minor bump            |
-| Breaking workflow change                  | `.github/workflows/<name>.yml` — major bump + announce |
-| New plugin skill                          | `skills/<name>/SKILL.md` + update `.claude-plugin/`    |
-| Convention every project repo should know | `claude/rules/<topic>.md` — picked up by `setup`       |
-| Internal rule (meta-repo authoring only)  | `claude/rules/<topic>.md` + skip-list in `setup`       |
+| Change                                    | File(s) to touch                                            |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| Bug in lint/check/test bash script        | `scripts/<name>.sh`                                         |
+| New optional workflow input               | `.github/workflows/<name>.yml`                              |
+| Breaking workflow change                  | `.github/workflows/<name>.yml` — announce in `#ai-help-desk` before merge |
+| New plugin skill                          | `skills/<name>/SKILL.md` + update `.claude-plugin/`         |
+| Convention every project repo should know | `claude/rules/<topic>.md` — picked up by `setup`            |
+| Internal rule (meta-repo authoring only)  | `claude/rules/<topic>.md` + skip-list in `setup`            |
 
 ## Self-test CI
 

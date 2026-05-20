@@ -4,7 +4,7 @@ name: Grid CI (reusable)
 #
 #   jobs:
 #     ci:
-#       uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0
+#       uses: thanx-ai/grid/.github/workflows/ci.yml@master
 #       secrets:
 #         WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 #

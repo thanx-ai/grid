@@ -42,10 +42,9 @@ Claude Code uses a two-step marketplace + plugin model. Register this repo as a 
 
 The marketplace name is auto-derived from the repo slug (`thanx-ai/grid` → `thanx-ai-grid`). After install + reload, subsequent sessions see `/grid:setup`, `/grid:create`, and `/grid:import` in the slash-command palette automatically.
 
-**To pin a specific version** at marketplace-add time, append `#<ref>` to the slug:
+**To pin a specific ref** at marketplace-add time, append `#<ref>` to the slug. We ship on `master`, so the unpinned form is the normal path; `#<branch>` is for testing a feature branch:
 
 ```text
-/plugin marketplace add thanx-ai/grid#v0.1.0      # tag
 /plugin marketplace add thanx-ai/grid#<branch>     # feature branch you're testing
 /plugin install grid@thanx-ai-grid
 ```
@@ -88,7 +87,7 @@ on:
 
 jobs:
   ci:
-    uses: thanx-ai/grid/.github/workflows/ci.yml@v0.1.0
+    uses: thanx-ai/grid/.github/workflows/ci.yml@master
     secrets:
       WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 
@@ -98,7 +97,7 @@ jobs:
     # No `with: includes:` input — deploy.yml infers the set from the commit
     # range and pushes each item with `wmill <type> push`. See
     # claude/rules/per-item-push-not-sync.md.
-    uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
+    uses: thanx-ai/grid/.github/workflows/deploy.yml@master
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 ```
@@ -122,11 +121,7 @@ A single project repo can ship apps to both folders — `/grid:create` asks each
 
 ## Versioning
 
-Pre-`v1` while the API is stabilizing. Pin to `@v0.1.0` (or `@v0` for rolling minors/patches within `0.x`).
-
-- **Patch** (`v0.1.0` → `v0.1.1`) — bug fixes, no input/output changes.
-- **Minor** (`v0.1.0` → `v0.2.0`) — new optional inputs / skill steps; backward-compatible.
-- **Major** (`v0.x` → `v1.0`) — breaking changes; announced via the `#ai-help-desk` Slack channel.
+We ship on `master`. Always pin callers to `@master` — there are no version tags to pick from. Breaking changes are announced via `#ai-help-desk` before they land.
 
 ## Help
 

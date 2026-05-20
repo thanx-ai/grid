@@ -35,14 +35,14 @@ The self-test workflow (`self-test.yml`) only catches YAML and shell syntax erro
 
 1. Make the change on a feature branch in this repo.
 2. Push the branch.
-3. In `thanx-ai/grid-shared`, temporarily change the workflow ref from `@v0.1.0` (or `@v0`) to `@<your-branch>` in `.github/workflows/grid.yml`.
+3. In `thanx-ai/grid-shared`, temporarily change the workflow ref from `@master` to `@<your-branch>` in `.github/workflows/grid.yml`.
 4. Open a PR in `grid-shared` against its master to trigger CI. Or push to a branch and `workflow_dispatch`.
 5. Watch the run in the GitHub Actions tab.
 6. When green, revert the workflow ref in `grid-shared` and merge your meta-repo PR.
 
 ```bash
 # In thanx-ai/grid-shared:
-sed -i '' 's|@v0\(.[0-9.]*\)\{0,1\}|@<your-branch>|g' .github/workflows/grid.yml
+sed -i '' 's|@master|@<your-branch>|g' .github/workflows/grid.yml
 git checkout -b test-thanx-ai-grid-<your-branch>
 git commit -am "test: pin to <your-branch>"
 gh pr create --draft
@@ -79,23 +79,11 @@ To add one:
 4. Explain _how to verify_ (a check, a command, a regex).
 5. Decide whether it applies to project repos. If meta-repo-internal only (e.g. about workflow authoring), add the filename to the skip-list in `skills/setup/SKILL.md` Step 4.
 
-## Bumping versions
+## Releasing
 
-After merging changes to `master`:
+There is no release step. We ship on `master`: every merge to `master` is live for every project repo on its next workflow run, because callers pin `@master`. That means PR review **is** the release gate — don't merge anything you wouldn't want every project repo running on its next deploy.
 
-```bash
-git checkout master && git pull
-# Pick the right bump:
-git tag v0.1.1                      # patch
-# or:  git tag v0.2.0                # minor
-# or:  git tag v1.0.0                # major (announce in #ai-help-desk first)
-
-# Update the moving major tag (callers pinning @v0 follow this):
-git tag -f v0
-git push --tags --force-with-lease
-```
-
-After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md` Step 3 (the scaffolded `grid.yml`) if the bump is minor or major (patches don't change the default).
+For breaking changes (workflow input/secret renames, removed scaffolded files), announce in `#ai-help-desk` **before** merging so consumers can update their callers in lockstep.
 
 ## Style conventions
 
@@ -105,13 +93,10 @@ After tagging, update the default `@v0.x.y` reference in `skills/setup/SKILL.md`
 - Skill `description:` frontmatter must include trigger phrases the user is likely to type (e.g. "set up grid", "bootstrap grid in this repo").
 - Workflow `description:` fields are required on every input and secret. Generated docs render them.
 
-## Release checklist
+## Pre-merge checklist
 
-Before tagging a new minor or major:
+Because merging is releasing, every PR needs:
 
-- [ ] CI green on master (`actionlint` + `shellcheck`)
-- [ ] `grid-shared` workflow passes against the new ref
-- [ ] Changelog entry (if applicable — TBD when we add one)
-- [ ] Tag pushed
-- [ ] `v0`/`v1` moving tag updated
-- [ ] If breaking: announce in `#ai-help-desk` with the upgrade path
+- [ ] Self-test CI green (`actionlint` + `shellcheck`)
+- [ ] `grid-shared` workflow tested end-to-end against the PR branch (see "Iterating on a reusable workflow" above)
+- [ ] If breaking: announced in `#ai-help-desk` with the upgrade path **before** merge

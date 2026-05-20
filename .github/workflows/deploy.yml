@@ -6,7 +6,7 @@ name: Grid Deploy (reusable)
 #     deploy:
 #       if: github.ref == 'refs/heads/master'
 #       needs: ci
-#       uses: thanx-ai/grid/.github/workflows/deploy.yml@v0.1.0
+#       uses: thanx-ai/grid/.github/workflows/deploy.yml@master
 #       secrets:
 #         WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 #
