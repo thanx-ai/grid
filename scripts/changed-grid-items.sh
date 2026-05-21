@@ -102,10 +102,24 @@ for path in "${changed[@]}"; do
       emit flow "$flow_yaml" "$remote"
       ;;
 
-    # Scripts: explicit .script.<lang> suffix. Anything else under f/
-    # (raw .ts / .py without the marker) is treated as part of the
-    # nearest .raw_app/ — caught by the *.raw_app/* arm above.
+    # Scripts: explicit .script.<lang> suffix. Highest-specificity match
+    # for files that want to be unambiguously labelled as a script.
     f/*/*.script.ts | f/*/*.script.js | f/*/*.script.py | f/*/*.script.sh)
+      emit script "$path"
+      ;;
+
+    # Bare scripts: .ts / .js / .py / .sh files at folder-root level
+    # outside any .raw_app/ or .flow/ directory (those arms above match
+    # first, so files inside them never reach this arm). This is the
+    # canonical pattern for raw_app backends + their tests:
+    #   f/<scope>/<name>.raw_app/...    (UI)
+    #   f/<scope>/<name>_loader.ts      (backend the app calls)
+    #   f/<scope>/<name>_loader_test.ts (deploy test, `// test: script/...`)
+    # See thanx-ai/grid-shared CLAUDE.md "Apps + backends" for the docs
+    # this enforces. Pre-2026-05-21 these were silently skipped, which
+    # left loaders + tests undeployed and made `run-deploy-tests.sh` 404
+    # on the first master push after CI was restored.
+    f/*/*.ts | f/*/*.js | f/*/*.py | f/*/*.sh)
       emit script "$path"
       ;;
 
