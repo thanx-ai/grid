@@ -36,13 +36,13 @@ The plugin's `/grid:create` (and sibling scaffolders) asks scope per item. A sin
 
 ### Reusable workflows
 
-Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid-tooling` at the same SHA into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why and how. **Within a single run the scripts always match the workflow YAML — `github.job_workflow_sha` resolves to the exact SHA the YAML was loaded from. Across runs, every caller is on `@master` and picks up the latest merge.**
+Both reusable workflows follow the same pattern: checkout the caller, checkout `thanx-ai/grid-tooling@master` into `.grid-meta/`, invoke shared scripts under `.grid-meta/scripts/`. See [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why `master` and not the SHA the reusable workflow YAML was loaded at. **Every caller is on `@master` anyway, so the small within-run drift window is consistent with the across-run policy.**
 
 The workflows expect callers to follow the Grid conventions (folder-permissioned `f/` paths, raw_app layout, deploy-test annotation pattern). Those conventions are documented in `claude/rules/` and ride along into project repos via the plugin's `setup` skill (Step 4).
 
 ### Versioning
 
-We ship on `master`. Callers pin `uses: thanx-ai/grid-tooling/.github/workflows/<name>.yml@master` and pick up every merge automatically — there are no version tags. Within a single workflow run the scripts stay consistent with the YAML because the meta-checkout uses `github.job_workflow_sha` (see [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md)); across runs, callers get whatever's on `master` at job-start time — by design.
+We ship on `master`. Callers pin `uses: thanx-ai/grid-tooling/.github/workflows/<name>.yml@master` and pick up every merge automatically — there are no version tags. The meta-checkout inside the reusable workflows also pins to `master` (see [`claude/rules/reusable-workflow-meta-checkout.md`](./claude/rules/reusable-workflow-meta-checkout.md) for why we can't use the workflow's resolved SHA against an external caller); both sides converge on whatever's on `master` at job-start time — by design.
 
 Because every merge is a live release, treat every PR like one: don't merge anything to `master` that you wouldn't want every project repo running on its next deploy. Breaking changes to workflow inputs, secret names, or scaffolded files need to be announced in `#ai-help-desk` before they land.
 

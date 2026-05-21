@@ -1,5 +1,5 @@
 ---
-title: "Reusable workflows: checkout the meta-repo at github.job_workflow_sha"
+title: "Reusable workflows: checkout the meta-repo at ref: master"
 tags: [github-actions, reusable-workflow, ci, workflow-design]
 ---
 
@@ -10,7 +10,7 @@ tags: [github-actions, reusable-workflow, ci, workflow-design]
 Every reusable workflow job that invokes a `scripts/` shell script must:
 
 1. Checkout the caller (default `actions/checkout@v6`, which checks out the repo that triggered the workflow).
-2. Checkout `thanx-ai/grid-tooling` at **`github.job_workflow_sha`** into `.grid-meta/`.
+2. Checkout `thanx-ai/grid-tooling` at **`master`** into `.grid-meta/`.
 3. Invoke the script as `bash .grid-meta/scripts/<name>.sh` from the caller's root.
 
 ```yaml
@@ -21,29 +21,32 @@ Every reusable workflow job that invokes a `scripts/` shell script must:
   uses: actions/checkout@v6
   with:
     repository: thanx-ai/grid-tooling
-    ref: ${{ github.job_workflow_sha }}
+    ref: master
     path: .grid-meta
 
 - name: Run shared script
   run: bash .grid-meta/scripts/lint-raw-apps.sh
 ```
 
-## Why `github.job_workflow_sha`, not `GITHUB_WORKFLOW_REF`
+## Why `master`, not `github.job_workflow_sha` or `GITHUB_WORKFLOW_REF`
 
-`github.job_workflow_sha` is documented as "for jobs using a reusable workflow, the commit SHA for the reusable workflow file." It resolves at job-start time to the SHA of THIS reusable workflow, regardless of how the caller pinned it (`@master`, `@<branch>`, `@<sha>`). It works for every external caller.
+The instinct is to checkout the meta-repo at the same SHA the reusable workflow YAML was loaded from, so the scripts can't drift from the workflow mid-run. Two earlier attempts failed against external callers:
 
-`GITHUB_WORKFLOW_REF` (and the equivalent `github.workflow_ref`) was the previous (broken) approach. It points at the **caller's trigger ref**, not the called reusable workflow's ref. For an external caller:
+1. **`${GITHUB_WORKFLOW_REF##*@}`** — this is the *caller's* trigger ref, not the called workflow's ref:
+   - PR trigger → `refs/pull/N/merge`
+   - Master push → `refs/heads/master`
+   `actions/checkout` then fails with `fatal: couldn't find remote ref refs/pull/N/merge` because those refs don't exist in `thanx-ai/grid-tooling`. (Self-test passes by coincidence — caller=callee, so `refs/heads/master` happens to exist locally.)
 
-- PR trigger → `caller-repo/.github/workflows/grid.yml@refs/pull/N/merge`
-- Master push → `caller-repo/.github/workflows/grid.yml@refs/heads/master`
+2. **`${{ github.job_workflow_sha }}`** — documented to "for jobs using a reusable workflow, the commit SHA for the reusable workflow file," but empirically resolves to **empty string** when the reusable workflow is in a different repo than the caller. With `ref:` empty, `actions/checkout` falls back to a `GET /repos/{owner}/{repo}` REST call to determine the default branch — and the caller's `GITHUB_TOKEN` cannot read this private repo's metadata, even though the org-level reusable-workflow access setting (`actions/permissions/access: organization`) authorizes loading the YAML and the git-protocol fetch. The REST API has stricter scoping than git-over-HTTPS for cross-repo, same-org private access. Result: `Not Found - https://docs.github.com/rest/repos/repos#get-a-repository` and the job dies before any real work runs.
 
-`${GITHUB_WORKFLOW_REF##*@}` then yields `refs/pull/N/merge` or `refs/heads/master`, and `actions/checkout@v6 repository: thanx-ai/grid-tooling ref: <that>` fails with `fatal: couldn't find remote ref refs/pull/N/merge` — those refs don't exist in `thanx-ai/grid-tooling`. The bug appeared only against external callers because for `self-test.yml` (caller=callee=thanx-ai/grid-tooling), `refs/heads/master` does exist locally and the checkout coincidentally succeeds.
+Hardcoding `ref: master` sidesteps both:
 
-## Why ref-matching matters at all
+- It's a real, fetchable ref in `thanx-ai/grid-tooling` (no `refs/pull/N/merge` confusion).
+- `actions/checkout` skips the REST default-branch lookup entirely when `ref:` is set, so it just does `git fetch origin refs/heads/master` over HTTPS — which the caller's GITHUB_TOKEN *can* perform under the org-level access setting.
 
-Callers pin `uses: thanx-ai/grid-tooling/.github/workflows/ci.yml@master`, which resolves to a specific SHA at job-start time. If we then checked out `thanx-ai/grid-tooling@master` separately for the scripts, **the script behavior could drift from the workflow YAML mid-run**: GitHub loads the YAML at one SHA, but a second `master` lookup minutes later might land on a fresher commit after another PR merged. The workflow and its scripts would silently disagree.
+## The trade-off
 
-`github.job_workflow_sha` resolves to the exact SHA the workflow YAML was loaded from, so the scripts ship at the same revision as the workflow that referenced them — even though both sides nominally point at `master`.
+`ref: master` means the scripts can drift from the workflow YAML mid-run if someone merges to `thanx-ai/grid-tooling` master between the moment GitHub loads the reusable workflow and the moment the meta-checkout step actually runs. That window is small (seconds), and the trade-off is consistent with the broader "ship on master" policy in [`CLAUDE.md`](../../CLAUDE.md) — every caller is on `@master` anyway, so the same drift can already happen across runs. We've decided that operational simplicity beats sub-minute drift protection.
 
 ## Why scripts live in `scripts/`, not in the workflow YAML
 
@@ -61,4 +64,4 @@ Each script does `repo_root="$(git rev-parse --show-toplevel)"` then `cd "$repo_
 
 ## How to verify a change to this pattern
 
-Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so `GITHUB_WORKFLOW_REF` happens to yield the right ref by coincidence. To verify any change to the meta-checkout flow, run the change against the `thanx-ai/grid-shared` repo's workflow end-to-end (PR CI green, master deploy succeeds). The `GITHUB_WORKFLOW_REF` bug shipped because this end-to-end check was skipped — self-test was the only gate.
+Self-test (`self-test.yml`) catches YAML / bash syntax errors but **cannot detect external-caller regressions** — its caller is itself, so any cross-repo failure mode is hidden. To verify any change to the meta-checkout flow, run the change against `thanx-ai/grid-shared`'s workflow end-to-end (PR CI green, master deploy succeeds). Both the `GITHUB_WORKFLOW_REF` bug and the `github.job_workflow_sha`-empty bug shipped because this end-to-end check was skipped — self-test was the only gate.

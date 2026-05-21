@@ -25,14 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Run actionlint
-        # -ignore 'property "job_workflow_sha"' — actionlint v1.7.12's github
-        # context type predates the addition of github.job_workflow_sha (real,
-        # documented runtime value for reusable workflows — see
-        # claude/rules/reusable-workflow-meta-checkout.md). Drop the -ignore
-        # once a newer actionlint release recognizes the field.
         run: |
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          ./actionlint -color -ignore 'property "job_workflow_sha"'
+          ./actionlint -color
 
   shellcheck:
     name: shellcheck
