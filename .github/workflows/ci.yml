@@ -39,15 +39,19 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Checkout thanx-ai/grid-tooling (for shared scripts)
-        # github.job_workflow_sha is the resolved SHA of THIS reusable workflow
-        # file, regardless of how the caller pinned it (tag, branch, SHA). It
-        # works for every caller; GITHUB_WORKFLOW_REF points at the caller's
-        # trigger ref (refs/pull/N/merge, refs/heads/master) which doesn't
-        # exist in this repo. See claude/rules/reusable-workflow-meta-checkout.md.
+        # ref: master is required. github.job_workflow_sha empirically
+        # evaluates to empty for external callers, which makes
+        # actions/checkout fall back to a `GET /repos/{owner}/{repo}`
+        # default-branch lookup that the caller's GITHUB_TOKEN cannot
+        # perform against this private repo (the org-level reusable-workflow
+        # access setting authorizes the YAML *load* and git-protocol fetch
+        # but not the REST metadata call). Hardcoded `master` matches the
+        # "ship on master" policy in CLAUDE.md / DEVELOPING.md.
+        # See claude/rules/reusable-workflow-meta-checkout.md.
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid-tooling
-          ref: ${{ github.job_workflow_sha }}
+          ref: master
           path: .grid-meta
 
       - uses: actions/setup-node@v6
@@ -75,7 +79,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid-tooling
-          ref: ${{ github.job_workflow_sha }}
+          ref: master
           path: .grid-meta
 
       - name: Verify referenced variables / resources exist in prod

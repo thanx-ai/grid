@@ -62,10 +62,12 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout thanx-ai/grid-tooling (for shared scripts)
+        # See claude/rules/reusable-workflow-meta-checkout.md — `master`
+        # because github.job_workflow_sha is empty for external callers.
         uses: actions/checkout@v6
         with:
           repository: thanx-ai/grid-tooling
-          ref: ${{ github.job_workflow_sha }}
+          ref: master
           path: .grid-meta
 
       - uses: actions/setup-node@v6
