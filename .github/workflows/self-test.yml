@@ -5,8 +5,11 @@ name: Self-test
 #
 # What this proves:
 #   - The reusable workflow YAML is well-formed (actionlint).
-#   - Every shell script under scripts/ parses (bash -n) and has no
-#     shellcheck errors.
+#   - Every shell script under scripts/ (incl. scripts/test/) parses
+#     (bash -n) and has no shellcheck errors.
+#   - Offline behavioral tests under scripts/test/ pass (e.g. the
+#     changed-grid-items.sh dependency-ordering test, which builds a
+#     throwaway git repo — no Windmill workspace involved).
 #
 # What this does NOT prove (deferred to integration test against
 # thanx-ai/grid-shared):
@@ -38,11 +41,39 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Bash syntax check
         run: |
+          # nullglob so an empty scripts/test/ yields no args rather than a
+          # literal "scripts/test/*.sh" path that bash -n would choke on.
+          shopt -s nullglob
           fail=0
-          for f in scripts/*.sh; do
+          for f in scripts/*.sh scripts/test/*.sh; do
             echo "▶ bash -n $f"
             bash -n "$f" || fail=1
           done
           exit $fail
       - name: shellcheck
-        run: shellcheck scripts/*.sh
+        run: |
+          shopt -s nullglob
+          files=(scripts/*.sh scripts/test/*.sh)
+          shellcheck "${files[@]}"
+
+  script-tests:
+    name: script-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run offline script tests
+        run: |
+          shopt -s nullglob
+          tests=(scripts/test/*-test.sh)
+          # Fail loud if the suite vanished — a silently-empty test job
+          # would look green while proving nothing.
+          if [ "${#tests[@]}" -eq 0 ]; then
+            echo "ERROR: no tests found under scripts/test/ (expected *-test.sh)" >&2
+            exit 1
+          fi
+          fail=0
+          for t in "${tests[@]}"; do
+            echo "▶ $t"
+            bash "$t" || fail=1
+          done
+          exit $fail

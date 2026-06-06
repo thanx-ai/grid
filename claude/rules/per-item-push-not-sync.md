@@ -39,6 +39,16 @@ done
 
 If the changed-items list is empty for a master-branch push, the workflow logs and exits 0 — silent no-op is fine, but **never** fall back to a workspace-wide sync as a "default deploy". That would defeat the whole rule.
 
+### The push order is dependency-ranked, not lexical
+
+`changed-grid-items.sh` emits its records in `wmill push` **dependency order**, and `deploy-grid-items.sh` pushes them in that order without re-sorting. The order has three tiers:
+
+1. `folder` — a folder must exist before any item created inside it.
+2. `script`, `app`, `flow`, `resource`, `variable` — runnables and standalone data.
+3. `schedule`, `trigger` — these reference a runnable by path, and `wmill schedule push` **validates the target exists** (`Not found: script not found at name <path>` otherwise), so they must come **after** tier 2.
+
+This matters because committing a script and its schedule (or a folder and its contents) in the **same commit** is normal and correct — the tooling must tolerate it. A plain `sort -u` orders records lexically by type (`app, flow, folder, resource, schedule, script, trigger, variable`), which pushes `schedule` *before* `script` (and *before* `variable`) and lands `folder` in the middle: the schedule push 404s on a runnable that doesn't exist yet, reds the whole deploy, and — because the deploy is git-diff-driven and never retries — orphans the schedule until someone hand-touches the `.schedule.yaml` in a fresh commit. The fix is a tier-ranked stable sort at the end of `changed-grid-items.sh`; don't regress it back to a bare `sort -u`. It's covered by `scripts/test/changed-grid-items-ordering-test.sh`.
+
 ## What about `wmill sync push` for local dev?
 
 `wmill sync push --dry-run` (without `--yes`) is still useful for local diffing. The rule is specifically about the CI deploy step. If you need to bulk-sync from your laptop, you're doing it knowingly and the destructive scope is on you.
