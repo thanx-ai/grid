@@ -5,7 +5,10 @@
 # Usage:
 #   scripts/changed-grid-items.sh <before-ref> <after-ref>
 #
-# Output: one TAB-separated record per line, sorted+deduped:
+# Output: one TAB-separated record per line, deduped and emitted in
+# `wmill push` dependency order (folders first; then runnables and
+# standalone data — script/app/flow/resource/variable; then the items
+# that reference them — schedule/trigger):
 #   <type>\t<arg1>[\t<arg2>]
 # where the args match what `wmill <type> push` expects:
 #   app       <local-path-to-.raw_app-dir>
@@ -159,4 +162,28 @@ for path in "${changed[@]}"; do
     *)
       ;;
   esac
-done | sort -u
+done | sort -u | awk -F'\t' '
+  # `wmill <type> push` has a real dependency order; lexical-by-type
+  # ordering (the old `sort -u` output) violates it and reds deploys:
+  #   - a folder must exist before any item inside it is pushed;
+  #   - schedule/trigger reference a runnable and `wmill schedule push`
+  #     validates the target script_path exists, so they must come AFTER
+  #     the script/app/flow they point at.
+  # Assign a dependency tier per type, then stable-sort by (tier, record).
+  # Within a tier there are no cross-deps the push validates, so lexical
+  # order is purely for determinism. Unknown types default to tier 1 (the
+  # middle), matching deploy-grid-items.sh, which errors on them anyway.
+  BEGIN {
+    rank["folder"]   = 0
+    rank["script"]   = 1; rank["app"]     = 1; rank["flow"] = 1
+    rank["resource"] = 1; rank["variable"] = 1
+    rank["schedule"] = 2; rank["trigger"]  = 2
+  }
+  { r = ($1 in rank) ? rank[$1] : 1; printf "%d\t%s\n", r, $0 }
+' | LC_ALL=C sort -t$'\t' -k1,1n -k2 -s | cut -f2-
+# -k1,1n: primary key = the prepended numeric tier. -k2 (open-ended, NOT
+# -k2,2): secondary key = the whole original record from field 2 onward,
+# so within a tier records are ordered lexically by their full
+# type+args — deterministic, not type-only. LC_ALL=C pins that to byte
+# order so it's identical on macOS and Ubuntu. cut -f2- then drops the
+# tier column, leaving the original <type>\t<arg1>[\t<arg2>] record.
