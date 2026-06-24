@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Test scripts/list-grid-items.sh — the full f/** inventory enumerator the
-# reconcile pass walks.
+# deploy pushes every master deploy.
 #
 # Asserts:
 #   - it enumerates one record for every deployable item TRACKED in the
-#     repo, regardless of commit range (the whole point: an item that
-#     missed its deploy window must still show up);
-#   - records come out in the same `wmill push` dependency order as the
-#     incremental path (folder first, runnables before schedule/trigger);
+#     repo (the whole point of full-inventory deploy: an item that missed an
+#     earlier deploy window must still show up and get pushed);
+#   - records come out in `wmill push` dependency order (folder first,
+#     runnables before schedule/trigger);
 #   - untracked / ignored files are NOT enumerated (they never deploy, so
-#     reconcile must not try to push them).
+#     the deploy must not try to push them).
 #
 # Runs offline: builds a throwaway git repo, never touches a workspace.
 
@@ -56,7 +56,7 @@ YAML
 git add -A
 git commit -q -m "seed full inventory"
 
-# An UNTRACKED item — present on disk but never committed. The reconcile
+# An UNTRACKED item — present on disk but never committed. The deploy
 # inventory must ignore it (untracked files never deploy).
 echo 'export function main() {}' >f/eng/scratch_untracked.ts
 

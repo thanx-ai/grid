@@ -12,10 +12,10 @@
 #
 # We push the FULL inventory every deploy rather than a commit-range diff.
 # `wmill <type> push` content-hashes each item and no-ops the unchanged
-# ones, so a full push is cheap, and it makes a missed deploy window
-# self-heal: an item that never reached the workspace (CI broken when it
-# landed, a force-push, an empty range) is pushed on the next deploy with
-# no special-casing. See claude/rules/deploy-full-inventory.md.
+# ones, so a full push is cheap, and it makes a missed deploy self-heal: an
+# item that never reached the workspace (CI was broken when it landed, or an
+# earlier deploy skipped it) is pushed on the next deploy with no
+# special-casing. See claude/rules/deploy-full-inventory.md.
 #
 # Thin wrapper: list-grid-items.sh enumerates the inventory in `wmill push`
 # dependency order, push-grid-items.sh runs the actual per-item push loop.

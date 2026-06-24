@@ -94,9 +94,9 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/master'
     needs: ci
-    # No `with: includes:` input — deploy.yml infers the set from the commit
-    # range and pushes each item with `wmill <type> push`. See
-    # claude/rules/per-item-push-not-sync.md.
+    # No `with: includes:` input — deploy.yml pushes the full f/** inventory
+    # on every master merge with `wmill <type> push` (unchanged items no-op
+    # on their content hash). See claude/rules/deploy-full-inventory.md.
     uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master
     secrets:
       WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}

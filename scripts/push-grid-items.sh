@@ -32,6 +32,9 @@ set -euo pipefail
 : "${WMILL_WORKSPACE:?WMILL_WORKSPACE must be set}"
 : "${WINDMILL_DEPLOY_TOKEN:?WINDMILL_DEPLOY_TOKEN must be set}"
 
+# Requires bash 4+ (ubuntu-latest runs bash 5). macOS system bash is 3.2 and
+# lacks `mapfile` — run this under a modern bash (e.g. `brew install bash`)
+# if invoking locally.
 mapfile -t entries
 
 if [ "${#entries[@]}" -eq 0 ]; then

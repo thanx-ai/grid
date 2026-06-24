@@ -1,6 +1,6 @@
 # Deploy uses per-item `wmill <type> push`, never `wmill sync push`
 
-**Rule.** The reusable `deploy.yml` pushes each changed item individually with `wmill <type> push <args>`. It does **not** run `wmill sync push`. The choice is structural, not stylistic — every item type's push is documented as "This overrides any remote versions" (an upsert), while `sync push` is documented as a diff-and-apply that **deletes anything in scope that exists on the remote but not in the local source** ([see `sync-push-deletes.md`](./sync-push-deletes.md)).
+**Rule.** The reusable `deploy.yml` pushes every item in the full `f/**` inventory individually with `wmill <type> push <args>` (see [`deploy-full-inventory.md`](./deploy-full-inventory.md)). It does **not** run `wmill sync push`. The choice is structural, not stylistic — every item type's push is documented as "This overrides any remote versions" (an upsert), while `sync push` is documented as a diff-and-apply that **deletes anything in scope that exists on the remote but not in the local source** ([see `sync-push-deletes.md`](./sync-push-deletes.md)).
 
 ## Why this matters here
 
@@ -23,17 +23,18 @@ Every item type has a `push` subcommand and every one says "This overrides any r
 | Trigger  | `wmill trigger push <file_path> <remote_path>`  | `.trigger.yaml`                                                        |
 | Folder   | `wmill folder push <name>`                      | `folder.meta.yaml` under `f/<name>/`                                   |
 
-Verify when bumping the CLI version: `wmill <type> --help | grep -A1 push` should still say "overrides any remote versions" for each.
+Verify when bumping the CLI version: `wmill <type> --help | grep -A1 push` should still say "overrides any remote versions" for each. Also re-check whether `wmill` reads the token from an env var (e.g. `WINDMILL_TOKEN`) rather than the `--token` flag `push-grid-items.sh` passes — env beats a CLI flag, which is visible in the process table (a non-issue on ephemeral isolated runners, but the cleaner form if available).
 
 ## How `deploy.yml` decides what to push
 
-The workflow pushes the **full `f/**` inventory** every deploy (see [`deploy-full-inventory.md`](./deploy-full-inventory.md)): `scripts/list-grid-items.sh` runs `git ls-files -- 'f/**'` through the shared classifier (`scripts/classify-grid-paths.sh`), which classifies each path by suffix into `<type> <local_path> [<remote_path>]` records, and `scripts/deploy-grid-items.sh` pipes those into `scripts/push-grid-items.sh`, which loops:
+The workflow pushes the **full `f/**` inventory** every deploy (see [`deploy-full-inventory.md`](./deploy-full-inventory.md)): `scripts/list-grid-items.sh` runs `git ls-files -- 'f/**'` through the shared classifier (`scripts/classify-grid-paths.sh`), which classifies each path by suffix into **TAB-separated** `<type>\t<arg1>[\t<arg2>]` records, and `scripts/deploy-grid-items.sh` pipes those into `scripts/push-grid-items.sh`, which loops (note: `app`/`script`/`folder` take a single arg; `flow`/`resource`/`variable`/`schedule`/`trigger` take `<local> <remote>` — so the call branches per type rather than passing a uniform `<remote>`):
 
 ```bash
-for entry in "${RECORDS[@]}"; do
-  read -r type local remote <<<"$entry"
-  wmill "$type" push "$local" "$remote" \
-    --workspace thanx --base-url "$WMILL_BASE_URL" --token "$WINDMILL_DEPLOY_TOKEN"
+while IFS=$'\t' read -r type arg1 arg2; do
+  case "$type" in
+    app|script|folder) wmill "$type" push "$arg1" "${common[@]}" ;;
+    *)                 wmill "$type" push "$arg1" "$arg2" "${common[@]}" ;;
+  esac   # common = --workspace … --base-url … --token …
 done
 ```
 
