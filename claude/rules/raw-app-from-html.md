@@ -101,7 +101,7 @@ For HTML imports, `wmill app lint` is necessary but not sufficient — lint catc
 Worse, a whole class of bugs renders **without throwing** — they look fine to lint and to a quick glance, and only a side-by-side with the source reveals them:
 
 - **Dropped `import "./index.css"` in `App.tsx`** → esbuild emits no `dist/bundle.css` and the app is fully unstyled. (Confirm `dist/bundle.css` is non-empty.)
-- **CSP-blocked external font** (item 3 above) → silent system-font fallback in production only.
+- **CSP-blocked external font** (rule 3 above) → silent system-font fallback in production only.
 - **Mismatched asset key** between a `load_assets` runnable and the frontend `useAsset(...)` → blank image. Derive the key from one canonical function on both sides (strip leading `/`, drop extension, `[^a-z0-9]+`→`_`, lowercase: `/demo-assets/brand/cover.jpg` → `demo_assets_brand_cover`).
 - **Lost icon size default** → an SVG ported to spread `{...props}` without a default `size`/`width`/`height` renders at full intrinsic size for callers passing only `className`. Keep the size default.
 
