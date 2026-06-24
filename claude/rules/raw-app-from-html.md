@@ -4,17 +4,24 @@
 
 1. **Hardcoded data literals must move to a backend script.** Inline `<script>` blocks in HTML dashboards routinely declare a 100KB+ `const CUBE = {…}` / `const DATA = […]` literal. Keep it inline in `App.tsx` and the snapshot ships in the JS bundle — bundle balloons, PR diff becomes hostile, and the data is no longer queryable from anything else in the workspace. Always write a deployed Windmill script at `f/<team>/load_<name>.ts` that exports the data and returns it from `main()`, then point the raw_app's `backend/<runnable>.yaml` at that script with `type: script`. If the data is large (>100KB) and the UI has a natural tab/view boundary, split the loader so the frontend can lazy-load the heavy part — `f/shared/load_customer_cube_overview.ts` + `f/shared/load_customer_cube_customers.ts` are the canonical example: the Overview tab loads on mount, the Customers tab lazy-loads the 200KB+ customers array on first open.
 2. **Client-side password gates are not access control.** A surprisingly common HTML-dashboard idiom is a `redacted/general/exec` mode toggle gated by SHA-256 hashes of the password against a hardcoded value. **Drop the gate during the port.** Anyone with the bundle can read the hashes and the data; the gate is obfuscation. In Windmill, group membership against the `f/<dept>/` folder is the real auth boundary (see [`folder-perms.md`](./folder-perms.md)). If data partitioning is genuinely required, split the loader: `f/shared/load_x_redacted.ts` (workspace-wide read+run) and a restricted-folder loader (e.g. `f/<restricted-team>/load_x_full.ts`, readable only to that group) — same UI calling two different runnables based on which one succeeds. No read-restricted folder exists in the workspace today; one would need to be stood up alongside a matching Google Workspace group.
-3. **Remote CSS `@import url('https://fonts…')` warns under esbuild.** Strip those lines from the migrated `index.css` and inject the stylesheet via a runtime `<link>` from `index.tsx`:
+3. **Remote fonts must be self-hosted — strip the `@import`, do NOT inject an external `<link>`.** Two independent failures, so dropping the `@import` alone is not enough:
 
-   ```tsx
-   const fontLink = document.createElement("link");
-   fontLink.rel = "stylesheet";
-   fontLink.href =
-     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap";
-   document.head.appendChild(fontLink);
+   - `scripts/lint-raw-apps.sh` treats any `[WARNING]` from `wmill app lint` as a CI failure, and esbuild **does** warn on remote `@import url(...)` in CSS — so the `@import` line has to go.
+   - The obvious fix — inject a runtime `<link>` to `fonts.googleapis.com`/`fonts.gstatic.com` from `index.tsx` — **fails in production.** It loads under `wmill app dev` (no CSP), so it looks fixed locally, but the **deployed app's Content-Security-Policy blocks the external request** and the font silently falls back to a system font. (Same CSP class as the no-external-CDN constraint; Next.js avoids it because `next/font` self-hosts.)
+
+   Self-host: download the `.woff2` for each weight the design uses, base64-encode it, and inline it as `@font-face` in `index.css` (the stylesheet `App.tsx` imports) so it ships inside `dist/bundle.css`:
+
+   ```css
+   @font-face {
+     font-family: "Inter";
+     font-weight: 400;
+     font-style: normal;
+     font-display: swap;
+     src: url("data:font/woff2;base64,<BASE64>") format("woff2");
+   }
    ```
 
-   `scripts/lint-raw-apps.sh` treats any `[WARNING]` from `wmill app lint` as a CI failure, and esbuild does warn on remote `@import url(...)` in CSS.
+   One `@font-face` per weight/style; keep only the weights you use (~15–30 KB of base64 each). A wrong/missing `@font-face` is invisible to lint — confirm the font applied by looking at the rendered output (see the visual-verification section below).
 
 ## CDN scripts → npm dependencies
 
@@ -75,9 +82,9 @@ After conversion, the raw_app should look exactly like this — no `src/`, no `i
 f/<team>/<name>.raw_app/
 ├── raw_app.yaml         # framework: react18
 ├── package.json         # react + react-dom + any CDN-replacement npm deps
-├── index.tsx            # ReactDOM mount + any <link>/<script> runtime injections
-├── App.tsx              # The body markup as JSX + state + effects
-├── index.css            # The <style> contents, minus remote @import lines
+├── index.tsx            # ReactDOM mount + any CDN <script> runtime injections (no font <link> — see rule 3)
+├── App.tsx              # The body markup as JSX + state + effects; imports ./index.css
+├── index.css            # The <style> contents, minus remote @import lines, plus inlined base64 @font-face
 ├── wmill.ts             # Typed stub mirroring each backend/*.yaml return shape
 └── backend/
     └── load<Name>.yaml  # type: script, path: f/<team>/load_<name>
@@ -87,9 +94,18 @@ The deployed loader (`f/<dept>/load_<name>.script.ts`) holds the data and **must
 
 Refresh the snapshot by re-running whatever generated the source HTML and committing a new version of `load_<name>.ts` (the test usually doesn't need to change unless the shape did).
 
-## Run `wmill app dev` before declaring success
+## Lint-green is not visually correct — look at the rendered output
 
-For HTML imports, `wmill app lint` is necessary but not sufficient — lint catches `[WARNING]`-level esbuild issues (unresolved imports, wrong wmill virtual surface) but does not catch React runtime errors. Hand-translated JSX from imperative HTML routinely ships render-time bugs (missing `key` props on `.map()` output, accessing `undefined.length` when stub data is empty, `useEffect` cleanup leaks). Spinning up `wmill app dev` and loading the bundle in a browser proves the React tree renders against the local stub data — see `/grid:import` Step 9 item 2.
+For HTML imports, `wmill app lint` is necessary but not sufficient — lint catches `[WARNING]`-level esbuild issues (unresolved imports, wrong wmill virtual surface) but does not catch React runtime errors. Hand-translated JSX from imperative HTML routinely ships render-time bugs (missing `key` props on `.map()` output, accessing `undefined.length` when stub data is empty, `useEffect` cleanup leaks). Spinning up `wmill app dev` and loading the bundle in a browser proves the React tree renders against the local stub data — see `/grid:import` Step 9 item 3.
+
+Worse, a whole class of bugs renders **without throwing** — they look fine to lint and to a quick glance, and only a side-by-side with the source reveals them:
+
+- **Dropped `import "./index.css"` in `App.tsx`** → esbuild emits no `dist/bundle.css` and the app is fully unstyled. (Confirm `dist/bundle.css` is non-empty.)
+- **CSP-blocked external font** (rule 3 above) → silent system-font fallback in production only.
+- **Mismatched asset key** between a `load_assets` runnable and the frontend `useAsset(...)` → blank image. Derive the key from one canonical function on both sides (strip leading `/`, drop extension, `[^a-z0-9]+`→`_`, lowercase: `/demo-assets/brand/cover.jpg` → `demo_assets_brand_cover`).
+- **Lost icon size default** → an SVG ported to spread `{...props}` without a default `size`/`width`/`height` renders at full intrinsic size for callers passing only `className`. Keep the size default.
+
+When you have the source (a running source app, the source `.html`, or a deployed reference), drive both with Playwright and **pixel-diff per route/view** (`pixelmatch`); otherwise eyeball each view in the `wmill app dev` tab against the source. Treat a visual mismatch as a blocker, same as a lint `[WARNING]`.
 
 Make the `wmill.ts` mocks return small **representative** data (one or two rows of each shape, not empty arrays). Empty stubs pass too easily — they exercise the loading branch and skip the real render path.
 
