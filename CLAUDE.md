@@ -116,6 +116,7 @@ If you hit a non-obvious gotcha while working here — a misleading doc, a CLI f
 
 - Short, self-contained rule → new file under `claude/rules/<topic>.md` (one sentence lede, then _why_ it bit us and _how to verify_).
 - Contradicts something here or in `README.md` → fix that text inline too.
+- **A raw-app authoring rule also constrains the scaffolds.** When you add or change a `raw-app-*.md` rule, grep `skills/create/SKILL.md` and `skills/import/SKILL.md` for example code that the rule now contradicts and fix it in the same PR — the scaffolds emit the canonical shape, so stale example code there ships the exact bug the rule warns against. (This bit us: the `create` skill's `wmill.ts` stub kept emitting top-level functions and a `wmill.<id>(...)` call shape long after `raw-app-wmill-virtual.md` documented the `export const backend = {}` / `wmill.backend.<id>(args)` form.)
 
 Rules that apply to project repos (e.g. raw-app authoring gotchas) ride along into every project repo via the `setup` skill. Rules that are meta-repo-internal (e.g. `reusable-workflow-meta-checkout.md`) stay here only — the skill's skip-list excludes them.
 
