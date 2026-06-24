@@ -59,8 +59,10 @@ claude/rules/           # conventions Claude reads at session start
 scripts/                # bash scripts invoked by reusable workflows
   lint-raw-apps.sh
   check-variable-references.sh
-  changed-grid-items.sh   # classifies changed paths into wmill push args
-  deploy-grid-items.sh    # loops `wmill <type> push` over the changed set
+  classify-grid-paths.sh  # shared path->wmill-push-record classifier (stdin->stdout)
+  list-grid-items.sh      # full f/** inventory -> classify-grid-paths.sh
+  push-grid-items.sh      # shared per-item `wmill <type> push` loop (stdin records)
+  deploy-grid-items.sh    # deploy: list-grid-items.sh | push-grid-items.sh (full inventory)
   run-deploy-tests.sh
 skills/                 # plugin skills (/grid:setup, /grid:create, /grid:import)
   setup/                # one-time repo bootstrap (wmill.yaml, workflow caller, token, rules)

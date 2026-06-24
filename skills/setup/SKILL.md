@@ -131,9 +131,9 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/master'
     needs: ci
-    # No `with: includes:` input — the reusable deploy.yml infers the
-    # changed set from the commit range and pushes each item via
-    # `wmill <type> push`. It never runs `wmill sync push` (see
+    # No `with: includes:` input — the reusable deploy.yml pushes the full
+    # f/** inventory each deploy via `wmill <type> push` (unchanged items
+    # no-op on their content hash). It never runs `wmill sync push` (see
     # claude/rules/sync-push-deletes.md for why that would be unsafe
     # across multiple project repos sharing the same f/ folders).
     uses: thanx-ai/grid-tooling/.github/workflows/deploy.yml@master
@@ -192,7 +192,7 @@ for rule in "$PLUGIN_RULES"/*.md; do
 done
 ```
 
-The skip-list excludes meta-repo-internal rules that don't apply to project repos: `reusable-workflow-meta-checkout.md` (how reusable workflows check out the meta-repo — only relevant when authoring the workflows themselves), `per-item-push-not-sync.md` (rationale for the workflow design — consumers see the behavior, not the implementation), and `wmill-sync-includes-flag.md` (documents an `--includes` knob that the current `deploy.yml` doesn't accept; copying it would mislead project-repo authors).
+The skip-list excludes meta-repo-internal rules that don't apply to project repos: `reusable-workflow-meta-checkout.md` (how reusable workflows check out the meta-repo — only relevant when authoring the workflows themselves), `per-item-push-not-sync.md` (rationale for the workflow design — consumers see the behavior, not the implementation), and `wmill-sync-includes-flag.md` (documents an `--includes` knob that the current `deploy.yml` doesn't accept; copying it would mislead project-repo authors). Note `deploy-full-inventory.md` is **not** skipped — its "every deploy re-pushes everything, so a UI edit to a variable/schedule gets reverted" gotcha is consumer-facing and rides along to project repos.
 
 `per-item-push-not-sync.md` stays meta-repo-internal — project repos consume the deploy behavior but don't need to author against the CLI surface table.
 
@@ -265,7 +265,7 @@ Then walk the user through confirming their token actually works against the Gri
 > - Build a raw app: `/grid:create`
 > - Import an existing project: `/grid:import`
 >
-> The first push to `master` (or `main`) triggers the deploy workflow. It pushes only the items changed in the commit range, one at a time (`wmill <type> push`), and never deletes anything outside the changeset — see `claude/rules/sync-push-deletes.md` for the why. Watch the run at `https://github.com/<owner>/<repo>/actions`.
+> The first push to `master` (or `main`) triggers the deploy workflow. It pushes the full `f/**` inventory, one item at a time (`wmill <type> push`), and never deletes — see `claude/rules/sync-push-deletes.md` for why it isn't `wmill sync push`, and `claude/rules/deploy-full-inventory.md` for why it pushes everything. Watch the run at `https://github.com/<owner>/<repo>/actions`.
 
 ## Idempotency
 

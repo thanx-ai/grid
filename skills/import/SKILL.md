@@ -687,7 +687,7 @@ Local dev:    wmill app dev <SCOPE>/<name>.raw_app
 Push by hand: wmill app push <SCOPE>/<name>.raw_app --workspace thanx \
                 --base-url https://grid-origin.thanx.com --token "$TOKEN"
 Auto-deploy:  merge to master — the reusable deploy workflow per-item-pushes
-              every changed item in the commit range. See
+              the full f/** inventory (this app included). See
               claude/rules/per-item-push-not-sync.md.
 Once live:    https://grid.thanx.com/apps/get/<SCOPE>/<name>
 ```

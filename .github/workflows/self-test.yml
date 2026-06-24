@@ -8,8 +8,8 @@ name: Self-test
 #   - Every shell script under scripts/ (incl. scripts/test/) parses
 #     (bash -n) and has no shellcheck errors.
 #   - Offline behavioral tests under scripts/test/ pass (e.g. the
-#     changed-grid-items.sh dependency-ordering test, which builds a
-#     throwaway git repo — no Windmill workspace involved).
+#     list-grid-items.sh inventory + dependency-ordering test, which builds
+#     a throwaway git repo — no Windmill workspace involved).
 #
 # What this does NOT prove (deferred to integration test against
 # thanx-ai/grid-shared):
