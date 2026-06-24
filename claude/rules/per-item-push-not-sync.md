@@ -27,27 +27,27 @@ Verify when bumping the CLI version: `wmill <type> --help | grep -A1 push` shoul
 
 ## How `deploy.yml` decides what to push
 
-The workflow runs a helper (`scripts/changed-grid-items.sh`) that takes a git commit range, runs `git diff --name-only`, and classifies each path by suffix into `<type> <local_path> <remote_path>` tuples. The deploy step then loops:
+The workflow pushes the **full `f/**` inventory** every deploy (see [`deploy-full-inventory.md`](./deploy-full-inventory.md)): `scripts/list-grid-items.sh` runs `git ls-files -- 'f/**'` through the shared classifier (`scripts/classify-grid-paths.sh`), which classifies each path by suffix into `<type> <local_path> [<remote_path>]` records, and `scripts/deploy-grid-items.sh` pipes those into `scripts/push-grid-items.sh`, which loops:
 
 ```bash
-for entry in "${CHANGED[@]}"; do
+for entry in "${RECORDS[@]}"; do
   read -r type local remote <<<"$entry"
   wmill "$type" push "$local" "$remote" \
     --workspace thanx --base-url "$WMILL_BASE_URL" --token "$WINDMILL_DEPLOY_TOKEN"
 done
 ```
 
-If the changed-items list is empty for a master-branch push, the workflow logs and exits 0 — silent no-op is fine, but **never** fall back to a workspace-wide sync as a "default deploy". That would defeat the whole rule.
+`wmill push` content-hashes each item and no-ops the unchanged ones. If the repo has no `f/**` items the workflow logs and exits 0 — but **never** fall back to a workspace-wide sync as a "default deploy". That would defeat the whole rule.
 
 ### The push order is dependency-ranked, not lexical
 
-`changed-grid-items.sh` emits its records in `wmill push` **dependency order**, and `deploy-grid-items.sh` pushes them in that order without re-sorting. The order has three tiers:
+`classify-grid-paths.sh` emits its records in `wmill push` **dependency order**, and `push-grid-items.sh` pushes them in that order without re-sorting. The order has three tiers:
 
 1. `folder` — a folder must exist before any item created inside it.
 2. `script`, `app`, `flow`, `resource`, `variable` — runnables and standalone data.
 3. `schedule`, `trigger` — these reference a runnable by path, and `wmill schedule push` **validates the target exists** (`Not found: script not found at name <path>` otherwise), so they must come **after** tier 2.
 
-This matters because committing a script and its schedule (or a folder and its contents) in the **same commit** is normal and correct — the tooling must tolerate it. A plain `sort -u` orders records lexically by type (`app, flow, folder, resource, schedule, script, trigger, variable`), which pushes `schedule` *before* `script` (and *before* `variable`) and lands `folder` in the middle: the schedule push 404s on a runnable that doesn't exist yet, reds the whole deploy, and — because the deploy is git-diff-driven and never retries — orphans the schedule until someone hand-touches the `.schedule.yaml` in a fresh commit. The fix is a tier-ranked stable sort at the end of `changed-grid-items.sh`; don't regress it back to a bare `sort -u`. It's covered by `scripts/test/changed-grid-items-ordering-test.sh`.
+This matters because a repo routinely holds a script and its schedule (or a folder and its contents) together — the tooling must push them in the right order. A plain `sort -u` orders records lexically by type (`app, flow, folder, resource, schedule, script, trigger, variable`), which pushes `schedule` *before* `script` (and *before* `variable`) and lands `folder` in the middle: the schedule push 404s on a runnable that doesn't exist yet and reds the whole deploy. The fix is a tier-ranked stable sort at the end of `classify-grid-paths.sh`; don't regress it back to a bare `sort -u`. It's covered by `scripts/test/list-grid-items-test.sh`.
 
 ## What about `wmill sync push` for local dev?
 

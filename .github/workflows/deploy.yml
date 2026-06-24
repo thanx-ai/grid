@@ -10,11 +10,17 @@ name: Grid Deploy (reusable)
 #       secrets:
 #         WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
 #
-# Pushes each Grid item changed in this commit range individually with
-# `wmill <type> push`. Never `wmill sync push` — that would let one
-# project repo's deploy delete items owned by another. See
-# claude/rules/per-item-push-not-sync.md for the design rationale and
-# the verified CLI surface.
+# Pushes the FULL f/** inventory, one item at a time, with `wmill <type>
+# push`. `wmill push` content-hashes each item and no-ops the unchanged
+# ones, so pushing everything every deploy is cheap — and it makes a missed
+# deploy window self-heal: an item that never reached the workspace (CI
+# broken when it landed, a force-push, an empty range) just gets pushed on
+# the next deploy, with no commit-range diffing to get wrong. See
+# claude/rules/deploy-full-inventory.md.
+#
+# Never `wmill sync push` — that would let one project repo's deploy delete
+# items owned by another. See claude/rules/per-item-push-not-sync.md for the
+# design rationale and the verified CLI surface.
 
 on:
   workflow_call:
@@ -55,11 +61,10 @@ jobs:
       WMILL_WORKSPACE: ${{ inputs.workspace }}
     steps:
       - name: Checkout caller repo
+        # Default shallow checkout is fine: the deploy enumerates the
+        # inventory with `git ls-files` (reads the index), not a commit-range
+        # `git diff`, so no history is needed.
         uses: actions/checkout@v6
-        # fetch-depth: 0 is required so `git diff <before>..<after>` in
-        # scripts/changed-grid-items.sh can resolve both ends.
-        with:
-          fetch-depth: 0
 
       - name: Checkout thanx-ai/grid-tooling (for shared scripts)
         # See claude/rules/reusable-workflow-meta-checkout.md — `master`
@@ -77,43 +82,14 @@ jobs:
       - name: Install wmill CLI
         run: npm install -g windmill-cli@${{ inputs.wmill_version }}
 
-      - name: Resolve commit range
-        id: range
-        # Two cases:
-        #   1. Normal push: github.event.before is the SHA just before the
-        #      push, github.sha is the new tip. Use that range as-is.
-        #   2. No useful before (workflow_dispatch, or initial push where
-        #      github.event.before is all-zeros): fall back to HEAD~1 so the
-        #      deploy still pushes the latest commit's items.
-        #   3. Root commit on initial push (HEAD has no parent): there's
-        #      nothing earlier to diff against; setting before=after makes
-        #      changed-grid-items.sh produce an empty changeset, which the
-        #      deploy step then treats as a no-op. Acceptable for an empty-
-        #      tree first commit; if the root commit has real items, push
-        #      them by hand via `wmill <type> push` once before merging.
-        run: |
-          before="${{ github.event.before || '' }}"
-          after="${{ github.sha }}"
-          zero="0000000000000000000000000000000000000000"
-          if [ -z "$before" ] || [ "$before" = "$zero" ]; then
-            if parent="$(git rev-parse --verify --quiet "${after}^")"; then
-              before="$parent"
-            else
-              # Root commit — see comment block above.
-              before="$after"
-            fi
-          fi
-          echo "before=$before" >> "$GITHUB_OUTPUT"
-          echo "after=$after" >> "$GITHUB_OUTPUT"
-          echo "Deploying range: $before..$after"
-
-      - name: Push changed Grid items
+      - name: Push all Grid items
+        # Pushes the full f/** inventory per-item; `wmill push` no-ops the
+        # unchanged ones via its content-hash check. Master-only (the whole
+        # job is master-gated by the caller). See
+        # claude/rules/deploy-full-inventory.md.
         env:
           WINDMILL_DEPLOY_TOKEN: ${{ secrets.WINDMILL_DEPLOY_TOKEN }}
-        run: |
-          bash .grid-meta/scripts/deploy-grid-items.sh \
-            "${{ steps.range.outputs.before }}" \
-            "${{ steps.range.outputs.after }}"
+        run: bash .grid-meta/scripts/deploy-grid-items.sh
 
       - name: Run deploy tests
         if: ${{ !inputs.skip_tests }}

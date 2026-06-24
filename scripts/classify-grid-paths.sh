@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Classify the set of paths changed between two git refs into the
+# Classify newline-separated f/** paths (read from stdin) into the
 # arguments needed for `wmill <type> push` calls.
 #
 # Usage:
-#   scripts/changed-grid-items.sh <before-ref> <after-ref>
+#   printf '%s\n' f/eng/foo.ts f/eng/bar.raw_app/app.yaml | scripts/classify-grid-paths.sh
+#
+# This is the shared path->record classifier. scripts/list-grid-items.sh
+# pipes the full f/** tree through it to produce the deploy set. It's kept
+# as a separate stdin->stdout filter so the suffix-matching and the
+# dependency ordering can be unit-tested without a git repo.
 #
 # Output: one TAB-separated record per line, deduped and emitted in
 # `wmill push` dependency order (folders first; then runnables and
@@ -20,54 +25,14 @@
 #   trigger   <local-path>               <remote-path>
 #   folder    <folder-name>
 #
-# Deletions are *not* emitted — by design. The deploy workflow only
-# upserts items; removing an item from a project repo does not
-# propagate to the Grid. See claude/rules/per-item-push-not-sync.md.
+# Deletions are never produced — there's nothing to classify from a path
+# list (the caller passes only tracked, present files). The deploy workflow
+# only upserts items. See claude/rules/per-item-push-not-sync.md.
 #
-# Paths outside f/** are ignored — only items under the Grid namespace
-# are deployable.
+# Paths outside f/** are ignored — only items under the Grid namespace are
+# deployable.
 
 set -euo pipefail
-
-if [ $# -ne 2 ]; then
-  echo "usage: $0 <before-ref> <after-ref>" >&2
-  exit 64
-fi
-
-before="$1"
-after="$2"
-
-# Zero SHA (initial push) — fall back to comparing against the after
-# ref's parent. If after has no parent (root commit), there's nothing
-# to diff against; emit empty and let the caller no-op.
-zero_sha="0000000000000000000000000000000000000000"
-if [ "$before" = "$zero_sha" ]; then
-  if parent="$(git rev-parse --verify --quiet "$after^")"; then
-    before="$parent"
-  else
-    exit 0
-  fi
-fi
-
-# Both refs must be reachable from local history. If either isn't (e.g. a
-# force-push rewrote `before` out of the tree), fail loud rather than
-# silently producing an empty changeset — a silent no-op deploy on a
-# force-push would skip every item the user actually intended to push.
-for ref in "$before" "$after"; do
-  if ! git cat-file -e "$ref" 2>/dev/null; then
-    echo "ERROR: ref '$ref' is not reachable from local history." >&2
-    echo "  This usually means a force-push rewrote it. Re-run the deploy" >&2
-    echo "  workflow via workflow_dispatch, or push a no-op commit on master" >&2
-    echo "  to reset the before-ref baseline." >&2
-    exit 2
-  fi
-done
-
-# --diff-filter=ACMRT: Added, Copied, Modified, Renamed, Type-changed.
-# Deletions (D) and unmerged (U) are excluded — see per-item-push-not-sync.md.
-# No `|| true` here: with both refs verified above, a non-zero exit from
-# `git diff` is a real bug we want to surface, not swallow.
-mapfile -t changed < <(git diff --name-only --diff-filter=ACMRT "$before" "$after" -- 'f/**')
 
 # Process each path. We may emit multiple times for the same logical
 # item (e.g. several files inside one .raw_app/); final sort -u dedupes.
@@ -87,7 +52,8 @@ remote_from_yaml_suffix() {
   printf '%s\n' "${path%."$suffix"}"
 }
 
-for path in "${changed[@]}"; do
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
   case "$path" in
     # Apps: any file inside an *.raw_app/ directory — collapse to the
     # directory itself. `wmill app push <dir>` is the canonical form.

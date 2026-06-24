@@ -13,7 +13,7 @@ This repo is **not** where Grid code lives. It's the shared infrastructure that 
 Two workflows under `.github/workflows/` that project repos call via `uses:` from their own `.github/workflows/grid.yml`:
 
 - **`ci.yml`** — lints every `.raw_app/`, validates that every literal `wmill.getVariable("f/...")` reference resolves in the prod workspace.
-- **`deploy.yml`** — pushes each changed item individually with `wmill <type> push` (`app`, `script`, `flow`, `resource`, `variable`, `schedule`, `trigger`, `folder`). Each push is an upsert: it creates or updates the remote item but **never deletes** anything outside the changeset. Then executes deploy tests. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md) for why this isn't `wmill sync push`.
+- **`deploy.yml`** — pushes the **full `f/**` inventory** every master deploy, one item at a time with `wmill <type> push` (`app`, `script`, `flow`, `resource`, `variable`, `schedule`, `trigger`, `folder`). `wmill push` content-hashes each item and no-ops the unchanged ones, so a full push is cheap — and because every deploy pushes everything, an item that ever missed its deploy window self-heals on the next run with no commit-range bookkeeping. Each push is an upsert: it creates or updates the remote item but **never deletes**. Then executes deploy tests. See [`claude/rules/per-item-push-not-sync.md`](./claude/rules/per-item-push-not-sync.md) for why this isn't `wmill sync push`, and [`claude/rules/deploy-full-inventory.md`](./claude/rules/deploy-full-inventory.md) for why we push everything (and the workspace-edits-get-reverted tradeoff).
 
 ### 2. The `grid` Claude Code plugin
 

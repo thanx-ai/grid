@@ -260,9 +260,9 @@ Created <SCOPE>/<name>.raw_app/ — lint passes.
 Local dev:        wmill app dev <SCOPE>/<name>.raw_app
 Push by hand:     wmill app push <SCOPE>/<name>.raw_app --workspace thanx \
                     --base-url https://grid-origin.thanx.com --token "$TOKEN"
-Auto-deploy:      merge to master — .github/workflows/grid.yml will push this
-                  app (and any other changed items) via the reusable deploy
-                  workflow. See claude/rules/per-item-push-not-sync.md.
+Auto-deploy:      merge to master — .github/workflows/grid.yml pushes the
+                  full f/** inventory via the reusable deploy workflow (this
+                  app included). See claude/rules/per-item-push-not-sync.md.
 Once live:        https://grid.thanx.com/apps/get/<SCOPE>/<name>
 ```
 

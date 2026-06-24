@@ -2,7 +2,7 @@
 
 **Rule.** When you have a SQL file (a query, a migration, a stored procedure) in a project repo that should run on the Grid, **wrap it in a `*.script.ts` that calls a Windmill DB resource**. Don't try to ship the bare `.sql` file as a Grid item via the deploy workflow.
 
-This is interim guidance — Windmill natively supports SQL script languages (PostgreSQL, MySQL, MS SQL, BigQuery, Snowflake, Redshift, Oracle, DuckDB; see [Windmill docs](https://www.windmill.dev/docs/getting_started/scripts_quickstart/sql)), but our `scripts/changed-grid-items.sh` classifier doesn't yet emit a `<type>` entry for SQL files, so deploys would silently skip them. Wrapping in TypeScript sidesteps that entirely and gives the same workspace surface.
+This is interim guidance — Windmill natively supports SQL script languages (PostgreSQL, MySQL, MS SQL, BigQuery, Snowflake, Redshift, Oracle, DuckDB; see [Windmill docs](https://www.windmill.dev/docs/getting_started/scripts_quickstart/sql)), but our `scripts/classify-grid-paths.sh` classifier doesn't yet emit a `<type>` entry for SQL files, so deploys would silently skip them. Wrapping in TypeScript sidesteps that entirely and gives the same workspace surface.
 
 ## Why this matters
 
@@ -64,14 +64,14 @@ export async function main(conn: Resource<"snowflake">) {
 }
 ```
 
-The `*.sql` companion file is checked in but **not** picked up by `changed-grid-items.sh` as a deployable item — it's just a static asset the script bundles. The script wrapper is the deployable.
+The `*.sql` companion file is checked in but **not** picked up by `classify-grid-paths.sh` as a deployable item — it's just a static asset the script bundles. The script wrapper is the deployable.
 
 ## Why not native Windmill SQL scripts (yet)
 
 Windmill's native SQL script types (`*.flow` / `*.script` with `language: postgresql` etc.) would be ergonomic, but:
 
 1. The `wmill <type> push` CLI uses suffix-based detection. `wmill script push <path>` accepts `.ts`/`.js`/`.py`/`.sh` per its `--help`. SQL files don't fit the canonical suffix set, so the per-item push path needs a SQL-aware extension (likely `.script.pgsql` / `.script.snowflake.sql` / similar — needs verification against a live `wmill script push some.sql`).
-2. `scripts/changed-grid-items.sh` doesn't classify `*.sql` paths today. Adding the classification + the matching push invocation is a small follow-up but blocked on (1).
+2. `scripts/classify-grid-paths.sh` doesn't classify `*.sql` paths today. Adding the classification + the matching push invocation is a small follow-up but blocked on (1).
 
 Once both are settled, this rule becomes "use native SQL scripts for new code; wrappers are for migrations". For now, wrappers everywhere.
 
