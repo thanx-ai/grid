@@ -15,7 +15,7 @@ Three accepted source types:
 2. **Local project directory** — absolute or `~`-relative path containing `package.json`.
 3. **Single self-contained HTML file** — a `.html` file (or `file:///…` URL) with inline `<style>` and `<script>` blocks and **no relative `<script src=...>` siblings**. The skill extracts the styles into `index.css`, the body into `App.tsx`, and any large hardcoded data blob in the script (e.g. `const CUBE = {…}`) into a backend Windmill script. Use this when someone shares a stand-alone HTML dashboard, prototype, or report and asks for it to land in the workspace. See Step 1 → "Source mode HTML" for shape requirements and Step 8 → "HTML source transforms" for the conversion rules.
 
-Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. The on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the directory root, `backend/` subdirectory for runnables) is described in `claude/rules/raw-app-wmill-virtual.md`, `claude/rules/raw-app-inline-runnable-yaml.md`, and `claude/rules/raw-app-from-html.md`. Those three rules also document the gotchas that have already bitten us.
+Companion to `/grid:create`. `/grid:create` scaffolds an empty placeholder; `/grid:import` adapts existing code. The on-disk shape (`<SCOPE>/<name>.raw_app/` with files at the directory root, `backend/` subdirectory for runnables) is described in `claude/rules/raw-app-wmill-virtual.md`, `claude/rules/raw-app-inline-runnable-yaml.md`, `claude/rules/raw-app-windmill-client-import.md`, and `claude/rules/raw-app-from-html.md`. Those rules also document the gotchas that have already bitten us.
 
 ## When NOT to use
 
@@ -612,8 +612,10 @@ inlineScript:
     // to positional params here. See f/shared/load_cs_metrics.ts for the canon.
     //
     // If the runnable calls wmill.getVariable / getResource / runScript / etc.,
-    // import the client at the top of `content`. Every deployed Windmill script
-    // that uses wmill.* does this (see f/shared/slack_notify.ts line 1).
+    // import the client at the top of `content` — without it the runnable
+    // throws `wmill is not defined` at runtime and lint stays silent. Every
+    // deployed Windmill script that uses wmill.* does this (see
+    // f/shared/slack_notify.ts line 1; rule: raw-app-windmill-client-import.md).
     import * as wmill from "windmill-client";
 
     export async function main(lookbackDays: number = 30) {
@@ -650,7 +652,8 @@ At least one runnable must exist — `wmill app lint` fails on an empty `backend
 1. `wmill app lint <SCOPE>/<name>.raw_app` — must end with `✅ All checks passed`. Treat any `[WARNING]` as a blocker; CI does too (`.github/workflows/ci.yml: lint-raw-apps`).
    - The size annotation `dist/bundle.js  1.9mb ⚠️` is **not** the `[WARNING]` marker CI greps for. `scripts/lint-raw-apps.sh` strips ANSI escapes and matches the literal string `[WARNING]` — the emoji ⚠️ next to a bundle filename is just esbuild's "this is large" hint and won't fail CI on its own. If the bundle is large enough to be an actual concern, fix it (tree-shake, basic-dist variants, lazy chunks), but a 1–2 MB bundle for a charting app is the going rate.
 2. For **any new inline runnable**, OR **any source mode `html` import**, run `wmill app dev <SCOPE>/<name>.raw_app` and load `http://localhost:5173` in a browser before declaring success:
-   - **Inline runnables**: the lint accepts mis-shaped backend YAML silently — only the dev/runtime client rejects an inline runnable missing the `inlineScript:` wrapper. See `claude/rules/raw-app-inline-runnable-yaml.md`.
+   - **Inline runnables**: the lint accepts mis-shaped backend YAML silently — only the dev/runtime client rejects an inline runnable missing the `inlineScript:` wrapper (`claude/rules/raw-app-inline-runnable-yaml.md`), or one whose body calls `wmill.*` without `import * as wmill from "windmill-client"` (`claude/rules/raw-app-windmill-client-import.md`). Both lint clean and throw `wmill is not defined` / a `Failed to load` banner on first load.
+   - **Host services**: if a runnable calls a service on your host machine, `wmill app dev` runs it in a container, so `127.0.0.1` resolves to the worker, not the host (`ConnectionRefused`). Use `http://host.docker.internal:<port>` and bind the host service to `0.0.0.0`. See `claude/rules/raw-app-dev-host-networking.md`.
    - **HTML imports**: the App.tsx is a hand-translated React port of imperative HTML/JS — much higher chance of a runtime React error (undefined access, missing key, bad JSX, Plotly cleanup leak) than a normal `dir`/`github` import where the source was already React. `wmill app dev` against the `wmill.ts` stub catches "renders empty state cleanly" and "renders representative data without crashing" — the lint cannot. For this reason, make `wmill.ts` mocks return small but **representative** data (a couple of rows of each shape), not empty arrays, so the stub exercises the real render paths.
    - If `wmill workspace list` is empty, follow `CLAUDE.md` → **Local raw_app dev — first-time setup** to add the `local` workspace before this step.
 3. **Manually verify every literal `wmill.getVariable("f/...")` / `wmill.getResource("f/...")` you wrote into a `backend/*.yaml` inline script exists in the prod workspace.** `bash scripts/check-variable-references.sh` only scans `*.ts` / `*.py` / `*.go` (see the `--include` flags in the script) — it does **not** read inline YAML content, so the CI check will silently pass for unresolved variable refs buried inside `inlineScript.content`. Until that gap is closed, the check is on you. Run e.g. `wmill variable list --workspace thanx | grep <SCOPE>/<NAME>` for each literal, or hit `GET /api/w/thanx/variables/exists/<SCOPE>/<NAME>` with your prod token. If any path is missing, create the variable in the Windmill UI before deploying. See `claude/rules/scaffold-getvariable-placeholders.md` for the failure mode this prevents.
