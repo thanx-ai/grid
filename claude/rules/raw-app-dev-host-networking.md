@@ -19,6 +19,8 @@ A runnable that works when you `curl http://127.0.0.1:8787` from your shell fail
 
 `host.docker.internal` is Docker's built-in DNS name for the host gateway; it resolves from inside the worker to your machine. But the host service also has to listen on a non-loopback interface — a server bound to `127.0.0.1` accepts only the host's own loopback, so the bridged request from the container is refused even with the right hostname.
 
+**Platform note:** `host.docker.internal` resolves automatically on Docker Desktop (macOS / Windows). On native Docker Engine (Linux), the container needs `--add-host=host.docker.internal:host-gateway` or the hostname won't resolve at all — you'll get a DNS failure rather than `ConnectionRefused`. If the `wmill app dev` worker is Docker Desktop (the common Mac dev setup), this is automatic; on Linux, confirm the worker container is launched with that `--add-host` flag.
+
 ## If the host service fail-closes on non-loopback source IPs
 
 A host API that trusts only loopback source IPs (a common "local dev is safe" shortcut) will reject the container's request — the source IP is the Docker bridge (RFC1918, e.g. `172.17.0.0/16`), not `127.0.0.1`. Add an explicit opt-in that trusts the Docker bridge / RFC1918 range, gated behind a flag, and **keep the credential check**: widening the trusted source range is not a substitute for auth.

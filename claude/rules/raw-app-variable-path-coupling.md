@@ -16,5 +16,5 @@ It bit the Ergane control pane (Jun 2026) on the `f/engineering` → `f/ergane` 
 
 ## How to verify
 
-- `grep -rn 'f/<old>/' <SCOPE>/<name>.raw_app/` after a rename — must return nothing.
+- After a rename, `grep -rn 'f/<old>/' <SCOPE>/<name>.raw_app/` (substitute the real old folder name and app path for the `<…>` placeholders) — must return nothing.
 - For each `getVariable`/`getResource` literal, confirm the path exists in both local and prod: `wmill variable list --workspace thanx | grep <SCOPE>/`. The CI check covers prod paths in `*.ts`/`*.py` source, but **not** paths buried in `inlineScript.content` YAML — verify those by hand (the same blind spot as [`raw-app-windmill-client-import.md`](./raw-app-windmill-client-import.md)).

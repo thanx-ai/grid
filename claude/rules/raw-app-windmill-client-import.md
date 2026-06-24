@@ -15,7 +15,7 @@ inlineScript:
     }
 ```
 
-There is no top-level `wmill` global in the worker runtime. Without the import the runnable throws `wmill is not defined` the first time it executes. Every deployed Windmill script that touches `wmill.*` imports it (see `f/shared/slack_notify.ts` line 1).
+There is no top-level `wmill` global in the worker runtime. Without the import the runnable throws `wmill is not defined` the first time it executes. Every deployed Windmill script that touches `wmill.*` imports it (see `f/shared/slack_notify.ts` line 1, in the `thanx-ai/grid-shared` reference repo).
 
 If the body doesn't call `wmill.*` (a pure transform, static data) — omit the import. Don't add it speculatively.
 
@@ -23,7 +23,7 @@ If the body doesn't call `wmill.*` (a pure transform, static data) — omit the 
 
 `wmill app lint` validates the frontend bundle + the wmill-virtual interception. It never executes the backend runnables, so a missing import inside `inlineScript.content` passes clean. The failure surfaces only at runtime, and because raw apps render backend errors as a "Failed to load" banner, it looks like a frontend regression — it isn't; the runnable never ran.
 
-This is the same lint blind spot as [`scaffold-getvariable-placeholders.md`](./scaffold-getvariable-placeholders.md) (missing variable) and [`raw-app-inline-runnable-yaml.md`](./raw-app-inline-runnable-yaml.md) (wrong YAML shape): all three lint-clean and fail only on execution.
+This is the same lint blind spot as [`scaffold-getvariable-placeholders.md`](./scaffold-getvariable-placeholders.md) (missing variable) and [`raw-app-inline-runnable-yaml.md`](./raw-app-inline-runnable-yaml.md) (wrong YAML shape): all three lint-clean and fail only on execution. (Note `raw-app-inline-runnable-yaml.md` also recommends preferring `type: script` over inline runnables in the first place — this import rule applies whenever you do go inline, but inline isn't the default.)
 
 It bit the Ergane control pane (Jun 2026): 14 `backend/*.yaml` inline scripts called `wmill.getVariable(...)` without the import; lint printed `✅ All checks passed`, and every runnable threw `wmill is not defined` on first load.
 

@@ -214,7 +214,7 @@ export const backend = {
 };
 ```
 
-If the app has no backend runnables yet, scaffold the stub with an empty object — `export const backend = {};` — and add methods as you wire up `backend/<id>.yaml` files.
+`loadCsMetrics` / `ExampleRow` above are illustrative — rename them to this app's actual runnables and return types. If the app has no backend runnables yet, scaffold the stub with an empty object — `export const backend = {};` — and add methods as you wire up `backend/<id>.yaml` files.
 
 **`backend/<runnable>.yaml`** (one per backend script the app calls):
 
