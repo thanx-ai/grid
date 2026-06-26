@@ -20,9 +20,9 @@ Everyone's agent has the Keystone MCP server loaded. Before you wire anything in
 
 ## Runtime: REST call from the Windmill job, authed with the shared token
 
-A deployed Windmill flow/script can't call MCP. It calls Keystone's REST API instead, reading the workspace-shared token from the Windmill variable **`f/shared/KEYSTONE_ACCESS_TOKEN`** (already provisioned — you don't mint your own). This is the answer to "what's the contract":
+A deployed Windmill flow/script can't call MCP — MCP is an agent-side transport, and a Windmill job runs as an isolated process with no MCP client runtime, so the `snowflake_query` *tool* simply isn't there at runtime. It calls Keystone's REST API instead, reading the workspace-shared token from the Windmill variable **`f/shared/KEYSTONE_ACCESS_TOKEN`** (already provisioned — you don't mint your own). This is the answer to "what's the contract":
 
-1. **Endpoint:** `POST https://keystone.thanx.com/api/v1/snowflake/query` (replicas: `/api/v1/replica/query`).
+1. **Endpoint:** `POST https://keystone.thanx.com/api/v1/snowflake/query` (replicas: `POST https://keystone.thanx.com/api/v1/replica/query`).
 2. **Auth header:** `Authorization: Bearer <token>` — yes, Bearer.
 3. **Payload:** raw SQL, same shape as the MCP tool — `{"query": "...", "database": "ANALYTICS", "schema": "THANX"}`.
 4. **Response:** `{ "data": {...}, "metadata": {...} }`, PII already sanitized.
@@ -61,7 +61,7 @@ The typical dashboard shape is exactly this: an hourly scheduled flow runs the q
 
 ## Why this matters
 
-This came out of a real request (sara-grid Phase 2, June 2026): the plan was to ask data-eng to provision a read-only Snowflake service account and configure it as a `c_snowflake` resource at `f/<scope>/snowflake_dashboard_reader`, holding account/warehouse/role/username/password. The better answer is Keystone:
+This came out of a real request (a project repo's product-adoption dashboard migration, Phase 2, mid-2026): the plan was to ask data-eng to provision a read-only Snowflake service account and configure it as a `c_snowflake` resource at `f/<scope>/snowflake_dashboard_reader`, holding account/warehouse/role/username/password. The better answer is Keystone:
 
 - **No credential lifecycle.** No service account to provision, no password sitting in a Windmill resource, nothing to rotate. The only secret is the shared `KEYSTONE_ACCESS_TOKEN`, managed centrally.
 - **PII masking is automatic and non-optional.** Keystone sanitizes results before returning them. This is the same reason raw customer PII is intentionally *not* reachable through agentic systems at Thanx — Keystone is the sanctioned, audited path. If a dashboard genuinely needs unmasked PII (rare), that is a different, non-Grid conversation — don't try to route it through a Grid app.
