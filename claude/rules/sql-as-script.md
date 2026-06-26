@@ -2,6 +2,8 @@
 
 **Rule.** When you have a SQL file (a query, a migration, a stored procedure) in a project repo that should run on the Grid, **wrap it in a `*.script.ts` that calls a Windmill DB resource**. Don't try to ship the bare `.sql` file as a Grid item via the deploy workflow.
 
+> **First ask whether you need a DB resource at all.** For read-only Snowflake (`ANALYTICS.*`) or read-replica analytics, query **through Keystone** instead — no service account, no `c_snowflake` resource, PII masking + audit for free. See [`keystone-data-access.md`](./keystone-data-access.md). The `Resource<"...">` pattern below is for cases Keystone can't serve (a warehouse it doesn't proxy, or writes).
+
 This is interim guidance — Windmill natively supports SQL script languages (PostgreSQL, MySQL, MS SQL, BigQuery, Snowflake, Redshift, Oracle, DuckDB; see [Windmill docs](https://www.windmill.dev/docs/getting_started/scripts_quickstart/sql)), but our `scripts/classify-grid-paths.sh` classifier doesn't yet emit a `<type>` entry for SQL files, so deploys would silently skip them. Wrapping in TypeScript sidesteps that entirely and gives the same workspace surface.
 
 ## Why this matters
