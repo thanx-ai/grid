@@ -12,17 +12,19 @@ edit code  →  test against local Windmill  →  looks right?  →  git push to
 
 **1. Run Windmill locally.** `docker compose up -d` with Windmill's own compose file — see <https://www.windmill.dev/docs/advanced/self_host> for the current one. This gives you a Windmill instance at `http://localhost:8000` with a single `bun`-tagged worker (relevant if you write deploy tests — see [`deploy-test-no-nested-job.md`](./deploy-test-no-nested-job.md)).
 
-**2. Mint a CLI token.** The `wmill` CLI has no `--email --password` bootstrap, so exchange the local instance's default superadmin login for a persistent API token via two curl calls — auth-login, then token-create:
+**2. Mint a CLI token.** The `wmill` CLI has no `--email --password` bootstrap, so exchange the local instance's default superadmin login for a persistent API token via two curl calls — auth-login, then token-create. Both endpoints reply `text/plain` with the token as the raw response body (not JSON) — no parsing needed, but that also means an empty `$TOKEN` below is your signal something went wrong (bad creds, instance not up yet), not a JSON-shaped error to unwrap:
 
 ```bash
-SESSION_TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+SESSION_TOKEN=$(curl -sf -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@windmill.dev","password":"changeme"}')
 
-TOKEN=$(curl -s -X POST http://localhost:8000/api/users/tokens/create \
+TOKEN=$(curl -sf -X POST http://localhost:8000/api/users/tokens/create \
   -H "Authorization: Bearer $SESSION_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"label":"local-dev-cli"}')
+
+[ -z "$TOKEN" ] && echo "token mint failed — check the local instance is up and the login creds are current" >&2
 ```
 
 (`admin@windmill.dev` / `changeme` are Windmill's own documented OSS defaults for a fresh local instance, not a Thanx secret — change them on first login if you want, and re-run the login call with your new password.)
