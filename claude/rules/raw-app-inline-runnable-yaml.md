@@ -55,5 +55,5 @@ The accepted aliases for the inline form are `type: inline` or `type: runnableBy
 
 ## How to verify
 
-- Run `wmill app dev f/<team>/<name>.raw_app` (configure a local workspace first via `wmill workspace add`) and load `http://localhost:4000` in a browser. If a runnable is mis-shaped, the dev server logs `[backend] Job started: …` followed by the `Invalid runnable` error, and the frontend renders your `Failed to load` banner.
+- Run `wmill app dev f/<team>/<name>.raw_app` (configure a local workspace first via `wmill workspace add` — see `claude/rules/local-windmill-dev.md`) and load `http://localhost:5173` in a browser. If a runnable is mis-shaped, the dev server logs `[backend] Job started: …` followed by the `Invalid runnable` error, and the frontend renders your `Failed to load` banner.
 - For CI: there is no protection. Treat any new inline runnable as needing a manual `wmill app dev` smoke test before merge.
