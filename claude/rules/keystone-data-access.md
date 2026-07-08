@@ -76,3 +76,4 @@ This came out of a real request (a project repo's product-adoption dashboard mig
 ## Related
 
 - [`sql-as-script.md`](./sql-as-script.md) — the `Resource<"snowflake">` / workspace-DB-resource pattern. Reach for that only when Keystone can't serve the source (a warehouse Keystone doesn't proxy, or you need writes); for read-only Snowflake/replica analytics, prefer the Keystone path above.
+- [`local-windmill-dev.md`](./local-windmill-dev.md) — a local Windmill workspace has no `f/shared/KEYSTONE_ACCESS_TOKEN` (that's provisioned in the prod workspace only). To exercise the runtime path above locally, mint a personal Keystone token and set it as a variable at the same path in your local workspace.
