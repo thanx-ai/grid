@@ -53,6 +53,27 @@ If you do ship inline anyway, the operator has to run `wmill app set-permissione
 
 The accepted aliases for the inline form are `type: inline` or `type: runnableByName`; for the path form they are `type: path`, `type: runnableByPath`, or `type: script`. `wmill app pull` writes runnables in the `type: script` shape.
 
+## A `backend/<id>.yaml` with no `type:` field crashes `wmill app push`, not lint
+
+Found live in `grid-shared`'s `f/success/cs_app_icon_converter.raw_app`: a `backend/appstore_icon_fixer.yaml` sidecar shaped like a bare lock file —
+
+```yaml
+# ❌ Missing `type:` — looks like a lock/metadata file, not a runnable declaration
+summary: App Store Icon Fixer
+description: Flattens transparency, center-crops...
+lock: ''
+```
+
+— paired with a same-named `appstore_icon_fixer.py`. `wmill app lint` passes and `wmill app dev` runs fine, but `wmill app push` fails at policy-generation time with:
+
+```
+Error generating policy for app f/success/cs_app_icon_converter: TypeError: Iterator value undefined is not an entry object
+```
+
+Why: `loadRunnablesFromBackend` (in the CLI, search for "runnables from backend folder") only attaches the sibling script's content when the yaml says `type: inline` — it has no fallback for a same-named code file when `type:` is absent. Every `.yaml` in `backend/` claims its `runnableId` in a first pass regardless of shape, so an untyped file is stored as-is (no `type`, no `inlineScript`) and the sibling `.py`/`.ts` is never picked up. That untyped runnable then reaches `processRunnable` in `updateRawAppPolicy`, which returns `undefined` for anything that isn't `isRunnableByPath`/`isRunnableByName` — and the caller feeds the result straight into `Object.fromEntries` with no `.filter(Boolean)`, so one bad runnable crashes the whole app's push with a cryptic native-JS iterator error instead of a message naming the runnable.
+
+Fix: give every `backend/<id>.yaml` an explicit `type:` — `type: inline` (+ `inlineScript:`) or `type: script` (+ `path:`). There's no third shape. If you have a bare `{summary, description, lock}` sidecar next to a same-named script, it's missing `type: inline`.
+
 ## How to verify
 
 - Run `wmill app dev f/<team>/<name>.raw_app` (configure a local workspace first via `wmill workspace add` — see `claude/rules/local-windmill-dev.md`) and load `http://localhost:5173` in a browser. If a runnable is mis-shaped, the dev server logs `[backend] Job started: …` followed by the `Invalid runnable` error, and the frontend renders your `Failed to load` banner.
