@@ -1,6 +1,6 @@
-# Flow YAML — directory layout, `OpenFlow` shape, `input_transforms` inside `value:`, and quote `expr:` that contain `{`
+# Flow YAML — directory layout, `OpenFlow` shape, `input_transforms` inside `value:`, `wmill flow push`'s arg shape, and quote `expr:` that contain `{`
 
-Three gotchas that bit a session porting a fresh example flow:
+Gotchas that bit sessions porting or deploying a flow:
 
 ## 0. A flow is a `<name>.flow/` **directory** containing `flow.yaml` — not a bare `<name>_flow.yaml` file
 
@@ -82,7 +82,7 @@ modules:
         expr: flow_input.recipient
 ```
 
-The new canonical reference flow is **`f/engineering/example_demo_flow.yaml`** — copy from that, not `escalation_flow.yaml`.
+The new canonical reference flow is **`f/engineering/example_demo.flow/flow.yaml`** — copy from that, not `escalation_flow.yaml`.
 
 The same nesting rule applies inside `forloopflow.modules[*].value` (the inline `RawScript` there carries its own `input_transforms`). The `failure_module` follows the same `FlowModule` shape — `id: failure` + `value: { type: rawscript, ..., input_transforms: {...} }`.
 
@@ -109,6 +109,24 @@ iterator:
 ```
 
 Rule of thumb: if your `expr:` value contains any of `{ } [ ] , :` outside a string literal, quote it. Single-quote it if the expression contains double quotes; double-quote it otherwise.
+
+## 3. `wmill flow push`'s `file_path` arg is the `.flow/` directory, not `flow.yaml` itself
+
+`wmill flow push <file_path> <remote_path>` unconditionally appends `/flow.yaml` to `file_path` (`windmill-cli@1.700.1`, `pushFlow`: `if (!localPath.endsWith(SEP)) localPath += SEP; ... yamlParseFile(localPath + "flow.yaml")` — no check for a trailing `flow.yaml`, unlike `flow preview`, which does strip one). Pass the file itself and the CLI looks for a doubled path and fails:
+
+```
+Error parsing yaml f/engineering/example_demo.flow/flow.yaml/flow.yaml
+```
+
+```bash
+# ✅ Correct — the .flow directory
+wmill flow push f/engineering/example_demo.flow f/engineering/example_demo
+
+# ❌ Wrong — the flow.yaml file inside it
+wmill flow push f/engineering/example_demo.flow/flow.yaml f/engineering/example_demo
+```
+
+`scripts/classify-grid-paths.sh` emits the directory for this reason — if you're hand-rolling a `wmill flow push` call (e.g. testing from your laptop per `local-windmill-dev.md`), pass the directory too.
 
 ## How to verify
 

@@ -18,7 +18,7 @@
 # where the args match what `wmill <type> push` expects:
 #   app       <local-path-to-.raw_app-dir>
 #   script    <local-path-to-script-file>
-#   flow      <local-path-to-flow.yaml>  <remote-path>
+#   flow      <local-path-to-.flow-dir>  <remote-path>
 #   resource  <local-path>               <remote-path>
 #   variable  <local-path>               <remote-path>
 #   schedule  <local-path>               <remote-path>
@@ -62,13 +62,15 @@ while IFS= read -r path; do
       emit app "$app_dir"
       ;;
 
-    # Flows: any file inside an *.flow/ directory — push the flow.yaml.
-    # `wmill flow push <flow.yaml> <remote-path>` is the canonical form.
+    # Flows: any file inside an *.flow/ directory — push the .flow dir.
+    # `wmill flow push <.flow-dir> <remote-path>` is the canonical form.
+    # The CLI appends "/flow.yaml" to file_path unconditionally (it doesn't
+    # strip a trailing flow.yaml the way `flow preview` does) — passing the
+    # flow.yaml file itself here makes it look for flow.yaml/flow.yaml.
     f/*/*.flow/*)
       flow_dir="${path%%.flow/*}.flow"
-      flow_yaml="$flow_dir/flow.yaml"
       remote="${flow_dir%.flow}"
-      emit flow "$flow_yaml" "$remote"
+      emit flow "$flow_dir" "$remote"
       ;;
 
     # Scripts: explicit .script.<lang> suffix. Highest-specificity match

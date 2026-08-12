@@ -96,7 +96,7 @@ type_pos() {
 # Every tracked deployable item is enumerated (tab-separated literals).
 check "enumerates the folder"   has_record "$(printf 'folder\teng')"
 check "enumerates the app"      has_record "$(printf 'app\tf/eng/widget.raw_app')"
-check "enumerates the flow"     has_record "$(printf 'flow\tf/eng/pipeline.flow/flow.yaml\tf/eng/pipeline')"
+check "enumerates the flow"     has_record "$(printf 'flow\tf/eng/pipeline.flow\tf/eng/pipeline')"
 check "enumerates the script"   has_record "$(printf 'script\tf/eng/summary_email.ts')"
 check "enumerates the test"     has_record "$(printf 'script\tf/eng/summary_email_test.ts')"
 check "enumerates the resource" has_record "$(printf 'resource\tf/eng/conn.resource.yaml\tf/eng/conn')"
