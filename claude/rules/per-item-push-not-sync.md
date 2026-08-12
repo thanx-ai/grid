@@ -16,7 +16,7 @@ Every item type has a `push` subcommand and every one says "This overrides any r
 | -------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
 | App      | `wmill app push [file_path] [remote_path]`      | `.raw_app/` directory (args optional — infers from cwd + `wmill.yaml`) |
 | Script   | `wmill script push <path>`                      | `.script.ts` / `.script.py` / `.script.js` / `.script.sh`              |
-| Flow     | `wmill flow push <file_path> <remote_path>`     | `.flow/` directory with `flow.yaml`                                    |
+| Flow     | `wmill flow push <file_path> <remote_path>`     | `.flow/` directory with `flow.yaml` — pass the directory, not `flow.yaml` itself, see [`flow-yaml-shape.md#3`](./flow-yaml-shape.md#3-wmill-flow-pushs-file_path-arg-is-the-flow-directory-not-flowyaml-itself) |
 | Resource | `wmill resource push <file_path> <remote_path>` | `.resource.yaml`                                                       |
 | Variable | `wmill variable push <file_path> <remote_path>` | `.variable.yaml`                                                       |
 | Schedule | `wmill schedule push <file_path> <remote_path>` | `.schedule.yaml`                                                       |
