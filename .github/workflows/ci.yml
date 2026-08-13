@@ -96,9 +96,12 @@ jobs:
         with:
           node-version: "22"
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ inputs.bun_version }}
+      # Deliberately NOT oven-sh/setup-bun: bun ships on npm, so this needs no
+      # third-party action, and it matches how this file already installs the
+      # wmill CLI. Whether the org allows actions outside actions/* is not
+      # readable without admin, and a CI job is a bad place to find out.
+      - name: Install bun
+        run: npm install -g bun@${{ inputs.bun_version }}
 
       - name: Run every .raw_app/'s bun tests
         run: bash .grid-meta/scripts/test-raw-apps.sh
