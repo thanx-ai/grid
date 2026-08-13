@@ -8,10 +8,14 @@ name: Grid CI (reusable)
 #       secrets:
 #         WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 #
-# Runs two checks on the caller's repo:
+# Runs three checks on the caller's repo:
 #   1. `wmill app lint` on every f/**/<name>.raw_app/, treating esbuild
 #      warnings as errors.
-#   2. Verifies every literal wmill.getVariable("f/...") and
+#   2. `bun test` inside every f/**/<name>.raw_app/ that ships *_test.ts.
+#      Raw-app code cannot be covered by the `// test:` deploy tests — those
+#      execute on Windmill, where the ./wmill virtual module does not exist —
+#      so without this, app logic has no automated check at all.
+#   3. Verifies every literal wmill.getVariable("f/...") and
 #      wmill.getResource("f/...") path resolves in the prod workspace.
 
 on:
@@ -21,6 +25,10 @@ on:
         type: string
         default: "1.700.1"
         description: windmill-cli version to install.
+      bun_version:
+        type: string
+        default: "1.3.13"
+        description: bun version used to run raw-app tests. Pinned so CI matches laptops.
       base_url:
         type: string
         default: "https://grid-origin.thanx.com"
@@ -63,6 +71,37 @@ jobs:
 
       - name: Lint every .raw_app/ (warnings-as-errors)
         run: bash .grid-meta/scripts/lint-raw-apps.sh
+
+  test-raw-apps:
+    name: Test raw apps
+    runs-on: ubuntu-latest
+    # No secrets, so this runs on fork PRs too — app logic is exactly the kind
+    # of change an outside contributor is most likely to get subtly wrong.
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
+        # ref: master — same constraint as the lint job above.
+        # See claude/rules/reusable-workflow-meta-checkout.md.
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid-tooling
+          ref: master
+          path: .grid-meta
+
+      # npm for dependency install (package-lock.json is what the repo commits),
+      # bun to run the tests — the same runtime Windmill uses for these apps.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun_version }}
+
+      - name: Run every .raw_app/'s bun tests
+        run: bash .grid-meta/scripts/test-raw-apps.sh
 
   check-variable-references:
     name: Check getVariable / getResource references resolve
