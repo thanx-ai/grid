@@ -126,7 +126,6 @@ for file in "${files[@]}"; do
   fi
 
   saw_g_all=0
-  g_all_value=""
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     # Skip comment-only lines (leading whitespace then #).
@@ -141,7 +140,6 @@ for file in "${files[@]}"; do
 
     if [[ "$key" == "g/all" ]]; then
       saw_g_all=1
-      g_all_value="$value"
       if [[ "$value" == "true" ]]; then
         problems+=("$file: 'g/all: true' grants write access to every workspace user — if that's really intended, get explicit sign-off and consider whether a narrower grant would do instead")
       fi

@@ -49,6 +49,10 @@ seed_repo() { # seed_repo <dir>
   ( cd "$dir" && git init -q && git config user.email test@example.com && git config user.name test )
 }
 
+# Each `echo`/`printf` line below writes literal shell source (single
+# quotes deliberate — no expansion wanted here, this is generating the
+# *text* of the stub script, not evaluating it).
+# shellcheck disable=SC2016
 make_curl_stub() { # make_curl_stub <bindir> <case-body-lines...>
   local bindir="$1"; shift
   mkdir -p "$bindir"
