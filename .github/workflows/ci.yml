@@ -8,7 +8,7 @@ name: Grid CI (reusable)
 #       secrets:
 #         WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
 #
-# Runs three checks on the caller's repo:
+# Runs five checks on the caller's repo:
 #   1. `wmill app lint` on every f/**/<name>.raw_app/, treating esbuild
 #      warnings as errors.
 #   2. `bun test` inside every f/**/<name>.raw_app/ that ships *_test.ts.
@@ -17,6 +17,15 @@ name: Grid CI (reusable)
 #      so without this, app logic has no automated check at all.
 #   3. Verifies every literal wmill.getVariable("f/...") and
 #      wmill.getResource("f/...") path resolves in the prod workspace.
+#   4. Verifies every f/**/folder.meta.yaml's extra_perms only references
+#      known groups for the target workspace — catches a wrong-case or
+#      made-up group name (e.g. g/Operations instead of g/operations)
+#      before merge. See claude/rules/folder-perms.md. Static/offline —
+#      cannot catch a canonical-but-nonexistent group.
+#   5. Verifies every group/user referenced in a f/**/folder.meta.yaml
+#      actually exists in the live target workspace — the check that (4)
+#      structurally cannot do. Requires WMILL_READ_TOKEN; passes with a
+#      warning if absent, same as check (3).
 
 on:
   workflow_call:
@@ -33,10 +42,14 @@ on:
         type: string
         default: "https://grid-origin.thanx.com"
         description: Windmill API base URL (direct origin bypasses Cloudflare).
+      workspace:
+        type: string
+        default: "thanx"
+        description: Target Windmill workspace name. Must match the deploy.yml workspace input for this caller.
     secrets:
       WMILL_READ_TOKEN:
         required: false
-        description: Token with variables:read + resources:read. Without it, the variable-reference check passes with a warning.
+        description: Token with variables:read + resources:read + groups:read + users:read. Without it, the variable-reference and live-group checks pass with a warning.
 
 jobs:
   lint-raw-apps:
@@ -128,3 +141,45 @@ jobs:
         env:
           WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
         run: bash .grid-meta/scripts/check-variable-references.sh
+
+  check-folder-perms:
+    name: Check folder.meta.yaml ACLs
+    runs-on: ubuntu-latest
+    # Purely static — no workspace token needed, so this runs on fork PRs too.
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid-tooling
+          ref: master
+          path: .grid-meta
+
+      - name: Verify folder.meta.yaml extra_perms reference known groups
+        run: bash .grid-meta/scripts/check-folder-perms.sh "${{ inputs.workspace }}"
+
+  check-folder-groups-live:
+    name: Check folder.meta.yaml groups/users exist in the live workspace
+    runs-on: ubuntu-latest
+    # Skip on PRs from forks — no access to the read token.
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    env:
+      WMILL_BASE_URL: ${{ inputs.base_url }}
+      WMILL_WORKSPACE: ${{ inputs.workspace }}
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v6
+
+      - name: Checkout thanx-ai/grid-tooling (for shared scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: thanx-ai/grid-tooling
+          ref: master
+          path: .grid-meta
+
+      - name: Verify referenced groups/users exist in the live workspace
+        env:
+          WMILL_READ_TOKEN: ${{ secrets.WMILL_READ_TOKEN }}
+        run: bash .grid-meta/scripts/check-folder-groups-live.sh

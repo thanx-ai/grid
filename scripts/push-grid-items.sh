@@ -25,6 +25,17 @@
 # Records must already be in `wmill push` dependency order (folders, then
 # runnables/data, then schedule/trigger) — this script pushes them in the
 # order received and does not re-sort. The producer owns ordering.
+#
+# The CLI's exit code alone is not trustworthy: windmill-cli (version
+# pinned by the wmill_version input in deploy.yml) has been observed to
+# exit 0 even when the API rejected the push with a row-level-security
+# violation (HTTP 400,
+# `SqlErr: new row violates row-level security policy for table "..."`) —
+# e.g. a folder write attempted by a user/group without ACL access to it.
+# Left unchecked, that means a deploy can report all-green while an item
+# silently never landed. Every push below is run through run_push, which
+# greps the CLI's own output for that signature and fails the item
+# regardless of exit code.
 
 set -euo pipefail
 
@@ -54,6 +65,36 @@ wmill_common=(
   --token     "$WINDMILL_DEPLOY_TOKEN"
 )
 
+# Matches the API's row-level-security rejection message. Anchored on
+# "SqlErr:" (with the colon) rather than bare "SqlErr" — the unanchored
+# form also matches ordinary strings that appear in normal CI output (e.g.
+# "MySqlError: connection timeout", "loading sqlerrors_dashboard.raw_app"),
+# which would misclassify an unrelated failure as an RLS rejection and
+# fail the whole item. Case-insensitive since we're grepping
+# CLI-formatted output, not the raw JSON body.
+rls_rejection_pattern='row-level security policy|SqlErr:'
+
+# Run a `wmill ... push` invocation, streaming its output live (so CI logs
+# look exactly like they did before) while also capturing it to grep for
+# an RLS rejection the CLI itself reported as success. Returns failure if
+# either the exit code is non-zero OR the output matches the rejection
+# pattern.
+run_push() {
+  local out status
+  out="$(mktemp)"
+  if "$@" 2>&1 | tee "$out"; then
+    status=0
+  else
+    status=1
+  fi
+  if grep -Eiq "$rls_rejection_pattern" "$out"; then
+    echo "  ERROR: CLI reported success (exit $status) but output matched an RLS rejection — treating as failed." >&2
+    status=1
+  fi
+  rm -f "$out"
+  return "$status"
+}
+
 failed=()
 for entry in "${entries[@]}"; do
   # Skip blank lines defensively (a trailing newline from the producer
@@ -67,16 +108,16 @@ for entry in "${entries[@]}"; do
     app)
       # `wmill app push` with a single arg walks the .raw_app/ dir and
       # infers the remote path from its location relative to wmill.yaml.
-      wmill app push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
+      run_push wmill app push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
       ;;
     folder)
-      wmill folder push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
+      run_push wmill folder push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
       ;;
     script)
-      wmill script push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
+      run_push wmill script push "$arg1" "${wmill_common[@]}" || failed+=("$entry")
       ;;
     flow|resource|variable|schedule|trigger)
-      wmill "$type" push "$arg1" "$arg2" "${wmill_common[@]}" || failed+=("$entry")
+      run_push wmill "$type" push "$arg1" "$arg2" "${wmill_common[@]}" || failed+=("$entry")
       ;;
     *)
       echo "  ERROR: unknown item type '$type' from classify-grid-paths.sh" >&2

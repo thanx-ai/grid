@@ -81,11 +81,11 @@ owners:
   - admin@windmill.dev
 ```
 
-`g/all: false` is workspace-wide read+run (the value is the _write_ bit). `g/<DEPT>: true` grants write to the dept's SCIM group.
+`g/all: false` is workspace-wide read+run (the value is the _write_ bit). `g/<DEPT>: true` grants write to the dept's group — see the canonical per-workspace group list in `claude/rules/folder-perms.md` before typing one by hand; a wrong-case or made-up name here is a silent no-op that CI now catches (`check-folder-perms.sh` / `check-folder-groups-live.sh`), but it's cheaper to just look it up. (`f/success/` is `g/success`, not `g/customer_success` — that name is retired.)
 
-**Special case — `f/success/`**: the Google Workspace SCIM group is `customer_success` (predates the folder rename). Use `g/customer_success: true` for the success folder until the SCIM rename ships.
+**Before scaffolding a new `folder.meta.yaml`: check whether this folder already has an owning repo.** Only one repo should ever declare a given folder's ACL — every deploy re-pushes a repo's full `f/**` inventory, so a second repo declaring the same folder silently overwrites the first's grants on whichever merges last (see `claude/rules/folder-perms.md`). If the folder already exists live (check `grid.thanx.com` → Folders, or ask in `#ai-help-desk`), don't write a `folder.meta.yaml` for it here — just scaffold the item itself; its ACL is managed wherever the folder is already owned.
 
-If the SCIM group `g/<DEPT>` doesn't exist in Google Workspace yet, the dept's members won't have write access — the YAML grant is a no-op until provisioned. Request new groups in `#ai-help-desk`.
+If the group doesn't exist in the workspace yet, the dept's members won't have write access — the YAML grant is a no-op until provisioned. Request new groups in `#ai-help-desk`.
 
 ## Step 4: Scaffold the files
 
