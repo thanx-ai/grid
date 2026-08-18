@@ -65,9 +65,14 @@ wmill_common=(
   --token     "$WINDMILL_DEPLOY_TOKEN"
 )
 
-# Matches the API's row-level-security rejection message. Case-insensitive
-# since we're grepping CLI-formatted output, not the raw JSON body.
-rls_rejection_pattern='row-level security|SqlErr'
+# Matches the API's row-level-security rejection message. Anchored on
+# "SqlErr:" (with the colon) rather than bare "SqlErr" — the unanchored
+# form also matches ordinary strings that appear in normal CI output (e.g.
+# "MySqlError: connection timeout", "loading sqlerrors_dashboard.raw_app"),
+# which would misclassify an unrelated failure as an RLS rejection and
+# fail the whole item. Case-insensitive since we're grepping
+# CLI-formatted output, not the raw JSON body.
+rls_rejection_pattern='row-level security policy|SqlErr:'
 
 # Run a `wmill ... push` invocation, streaming its output live (so CI logs
 # look exactly like they did before) while also capturing it to grep for

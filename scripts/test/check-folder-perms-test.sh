@@ -8,10 +8,21 @@
 #   - a wrong-case group name (g/Operations instead of g/operations, or
 #     g/Success instead of g/success) is rejected — this is the exact
 #     incident that motivated the script: see claude/rules/folder-perms.md;
-#   - a folder.meta.yaml missing an explicit g/all entry is rejected;
+#   - a flush-left comment mid-block does NOT truncate parsing and hide a
+#     wrong-case group from validation (this exact bug let g/Operations
+#     pass silently in an earlier version of this script);
+#   - a quoted key (e.g. "g/Operations") is recognized the same as its
+#     unquoted form, in both directions (rejecting a bad quoted group,
+#     and NOT falsely rejecting a validly-quoted "g/all");
+#   - g/all: true (write access for the entire workspace) is flagged;
+#   - a folder.meta.yaml missing g/all is a WARNING, not a failure — some
+#     folders (exec financials, HR data) deliberately omit it;
+#   - the canonical list is workspace-aware: a group valid in one
+#     workspace but not the default is accepted when the right workspace
+#     is passed, and rejected against the wrong one;
 #   - a repo with no folder.meta.yaml files at all is a no-op pass.
 #
-# Runs offline: builds a throwaway git repo, never touches a workspace.
+# Runs offline: builds throwaway git repos, never touches a workspace.
 
 set -euo pipefail
 
@@ -100,29 +111,105 @@ YAML
 ( cd "$madeup" && git add -A && git commit -q -m seed )
 check "wrong-case group name (g/Success) is rejected" 1 bash -c "cd '$madeup' && bash '$script'"
 
-# --- Case 4: missing g/all — rejected --------------------------------------
+# --- Case 4: missing g/all is a WARNING, not a rejection --------------------
 noall="$(mktemp -d)"
 seed_repo "$noall"
-mkdir -p "$noall/f/sales"
-cat >"$noall/f/sales/folder.meta.yaml" <<'YAML'
-summary: Sales tools
+mkdir -p "$noall/f/exec"
+cat >"$noall/f/exec/folder.meta.yaml" <<'YAML'
+summary: Exec financials — deliberately no g/all
 extra_perms:
   admin@windmill.dev: true
-  g/sales: true
+  g/exec: true
 owners:
   - admin@windmill.dev
 YAML
 ( cd "$noall" && git add -A && git commit -q -m seed )
-check "missing g/all is rejected" 1 bash -c "cd '$noall' && bash '$script'"
+check "missing g/all is a warning (passes)" 0 bash -c "cd '$noall' && bash '$script'"
 
-# --- Case 5: no folder.meta.yaml files at all — no-op pass -----------------
+# --- Case 5: g/all: true is flagged -----------------------------------------
+allTrue="$(mktemp -d)"
+seed_repo "$allTrue"
+mkdir -p "$allTrue/f/success"
+cat >"$allTrue/f/success/folder.meta.yaml" <<'YAML'
+summary: Customer Success tools
+extra_perms:
+  admin@windmill.dev: true
+  g/all: true
+  g/success: true
+owners:
+  - admin@windmill.dev
+YAML
+( cd "$allTrue" && git add -A && git commit -q -m seed )
+check "g/all: true is rejected" 1 bash -c "cd '$allTrue' && bash '$script'"
+
+# --- Case 6: flush-left comment must not truncate the parsed block --------
+flushcomment="$(mktemp -d)"
+seed_repo "$flushcomment"
+mkdir -p "$flushcomment/f/operations"
+cat >"$flushcomment/f/operations/folder.meta.yaml" <<'YAML'
+summary: Operations tools
+extra_perms:
+  g/all: false
+# ---- team groups ----
+  g/Operations: true
+owners:
+  - admin@windmill.dev
+YAML
+( cd "$flushcomment" && git add -A && git commit -q -m seed )
+check "flush-left comment does not hide a bad key after it" 1 bash -c "cd '$flushcomment' && bash '$script'"
+
+# --- Case 7: quoted keys are recognized in both directions -----------------
+quotedBad="$(mktemp -d)"
+seed_repo "$quotedBad"
+mkdir -p "$quotedBad/f/operations"
+cat >"$quotedBad/f/operations/folder.meta.yaml" <<'YAML'
+summary: Operations tools
+extra_perms:
+  g/all: false
+  "g/Operations": true
+owners:
+  - admin@windmill.dev
+YAML
+( cd "$quotedBad" && git add -A && git commit -q -m seed )
+check "quoted bad-case group (\"g/Operations\") is rejected" 1 bash -c "cd '$quotedBad' && bash '$script'"
+
+quotedGood="$(mktemp -d)"
+seed_repo "$quotedGood"
+mkdir -p "$quotedGood/f/success"
+cat >"$quotedGood/f/success/folder.meta.yaml" <<'YAML'
+summary: Customer Success tools
+extra_perms:
+  "g/all": false
+  g/success: true
+owners:
+  - admin@windmill.dev
+YAML
+( cd "$quotedGood" && git add -A && git commit -q -m seed )
+check "quoted \"g/all\" is recognized, not falsely flagged missing" 0 bash -c "cd '$quotedGood' && bash '$script'"
+
+# --- Case 8: workspace-aware canonical list ---------------------------------
+hrworkspace="$(mktemp -d)"
+seed_repo "$hrworkspace"
+mkdir -p "$hrworkspace/f/talent_review"
+cat >"$hrworkspace/f/talent_review/folder.meta.yaml" <<'YAML'
+extra_perms:
+  u/karina: true
+  g/people_ops: true
+owners:
+  - admin@windmill.dev
+YAML
+( cd "$hrworkspace" && git add -A && git commit -q -m seed )
+check "g/people_ops rejected against default (thanx) workspace" 1 bash -c "cd '$hrworkspace' && bash '$script'"
+check "g/people_ops accepted when hr workspace is passed" 0 bash -c "cd '$hrworkspace' && bash '$script' hr"
+
+# --- Case 9: no folder.meta.yaml files at all — no-op pass -----------------
 empty="$(mktemp -d)"
 seed_repo "$empty"
 mkdir -p "$empty/f"
 ( cd "$empty" && git add -A 2>/dev/null; git commit -q -m seed --allow-empty )
 check "no folder.meta.yaml files is a no-op pass" 0 bash -c "cd '$empty' && bash '$script'"
 
-rm -rf "$good" "$badcase" "$madeup" "$noall" "$empty" /tmp/check-folder-perms-test.out
+rm -rf "$good" "$badcase" "$madeup" "$noall" "$allTrue" "$flushcomment" "$quotedBad" "$quotedGood" "$hrworkspace" "$empty" /tmp/check-folder-perms-test.out
 
 if [ "$fail" -ne 0 ]; then
   echo >&2

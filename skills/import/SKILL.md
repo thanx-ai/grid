@@ -257,7 +257,9 @@ If the user picks `f/<dept>/`, ask which department. Common ones: `engineering`,
 
 Store the chosen path as `<SCOPE>` (e.g. `f/company` or `f/engineering`). For the rest of this skill, `<SCOPE>/<name>.raw_app/` is the destination.
 
-**Folder bootstrap.** If `<SCOPE>/folder.meta.yaml` doesn't exist yet, scaffold it now using the template in `/grid:create` Step 3 (substituting the correct dept name + SCIM group). Without `folder.meta.yaml`, the first push won't have the right ACLs — the deploy still succeeds, but the app is visible to nobody until perms are added by hand. **Special case** — for `f/success/`, the SCIM group is `customer_success` (predates the folder rename).
+**Folder bootstrap.** Only if `<SCOPE>` has no owning repo anywhere yet: scaffold `<SCOPE>/folder.meta.yaml` now using the template in `/grid:create` Step 3 (substituting the correct dept name + group — see the canonical per-workspace list in `claude/rules/folder-perms.md`; `f/success/` is `g/success`, not `g/customer_success`, which is retired). Without `folder.meta.yaml` anywhere, the first push won't have the right ACLs — the deploy still succeeds, but the app is visible to nobody until perms are added by hand.
+
+If `<SCOPE>` already has an owning repo elsewhere (check `grid.thanx.com` → Folders, or ask in `#ai-help-desk`), do NOT scaffold a `folder.meta.yaml` here even if this repo doesn't have one locally — only one repo should ever declare a given folder's ACL, since every deploy re-pushes a repo's full inventory and a second declaration silently overwrites the first's grants on whichever merges last (see `claude/rules/folder-perms.md`). Just scaffold the item; its folder's ACL lives wherever it's already owned.
 
 ## Step 4: Ask the user — app name
 
